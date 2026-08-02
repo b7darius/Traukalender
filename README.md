@@ -136,6 +136,24 @@ ist der Meldeweg, der immer funktioniert. Push aufs Handy kommt über ntfy dazu.
    (Standard `2027-08`).
 4. *Settings → Notifications* prüfen, damit die Issue-Mails auch ankommen.
 
+**Wenn die Issue-Mail nicht ankommt**
+
+Das Issue wird angelegt, die E-Mail dazu hängt aber an den Kontoeinstellungen.
+Der Reihe nach prüfen:
+
+1. <https://github.com/notifications> – steht die Benachrichtigung dort? Dann
+   ist nur der Mailversand betroffen, nicht die Meldung selbst.
+2. Bei Gmail im Tab **Updates** und im Spam-Ordner nachsehen. GitHub-Mails
+   landen dort regelmäßig.
+3. *Settings → Notifications*: bei „Subscriptions" muss **Email** angehakt sein.
+4. *Settings → Emails*: ist die Adresse **verifiziert**?
+5. Auf der Repository-Seite oben rechts *Watch → All Activity* wählen.
+
+Das Issue wird dem Repository-Besitzer zugewiesen und erwähnt ihn im Text –
+beides löst auch bei der Standardeinstellung „Participating and @mentions" eine
+Benachrichtigung aus. Verlässlicher als jede E-Mail ist trotzdem ntfy: der Push
+geht direkt aufs Handy und hängt an keiner Kontoeinstellung.
+
 **Was beim Dauerbetrieb sonst noch zählt**
 
 * Geplante Workflows laufen nur vom **Standard-Branch** des Repositorys.
