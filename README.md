@@ -250,7 +250,82 @@ python3 -m unittest -v
 
 Die Tests laufen offline gegen eine Attrappe des Endpunkts.
 
-## Reservieren, wenn die Meldung kommt
+## Automatisch reservieren
+
+`traukalender_buchung.py` kann den Termin auch selbst reservieren, sobald einer
+frei wird. Voreingestellt: **Samstage im August 2027**, ausschließlich **Kurhaus**
+oder **Wiesbadener Casino-Gesellschaft**, und davon der **spätestmögliche**
+Termin – erst das späteste Datum, innerhalb des Tages die späteste Uhrzeit.
+
+> **Eine Reservierung ist verbindlich.** Sie wird beim Standesamt hinterlegt und
+> lässt sich per Skript nicht zurücknehmen, sondern nur telefonisch oder per
+> E-Mail beim Standesamt Wiesbaden.
+
+### Drei Stufen
+
+| Aufruf | Wirkung |
+|---|---|
+| `--trocken` (Standard) | sucht und zeigt an, was reserviert würde. Keinerlei Nebenwirkung. |
+| `--probe` | kompletter Durchlauf bis zur Bestätigungsseite, dort Abbruch. Blockiert den Termin für die Dauer des Durchlaufs. |
+| `--wirklich-buchen` | reserviert verbindlich. Zusätzlich muss `TK_BUCHUNG_AKTIV=1` gesetzt sein. |
+
+```bash
+python3 traukalender_buchung.py                       # nur anzeigen
+python3 traukalender_buchung.py --monate 2027-08,2027-09
+python3 traukalender_buchung.py --wochentage samstag,freitag --trauorte 1210
+```
+
+### Sicherungen
+
+* **Zwei Schalter.** Ohne `--wirklich-buchen` *und* `TK_BUCHUNG_AKTIV=1` wird
+  nie reserviert. Beides wird geprüft, bevor überhaupt gesucht wird.
+* **Nur einmal.** Nach einer erfolgreichen Reservierung liegt `state/gebucht.json`
+  im Repository. Solange die Datei existiert, unternimmt das Skript nichts mehr.
+* **Nie doppelt abschicken.** Der Weg bis zur Bestätigungsseite wird bei
+  Fehlern wiederholt – das Portal lehnt Formulare gelegentlich grundlos ab. Das
+  Absenden selbst wird **nie** wiederholt: Ein fehlgeschlagenes Absenden könnte
+  trotzdem angekommen sein.
+* **Termin immer freigeben.** Wird ein Termin ausgewählt und der Durchlauf
+  bricht danach ab, gibt das Skript ihn wieder frei, damit er nicht für andere
+  blockiert bleibt.
+
+### Personendaten hinterlegen
+
+Das Repository ist öffentlich – die Daten gehören deshalb ausschließlich in ein
+**Actions-Secret**, nie in eine Datei. Ein einziges Secret namens
+`TK_PERSONENDATEN` mit diesem JSON genügt:
+
+```json
+{
+  "partner1": {
+    "anrede": "frau", "vorname": "...", "name": "...",
+    "strasse": "... 1", "plz": "12345", "ort": "...",
+    "land": "DE", "staat": "deutsch"
+  },
+  "partner2": { "anrede": "herr", "vorname": "...", "name": "...",
+                "strasse": "... 1", "plz": "12345", "ort": "...",
+                "land": "DE", "staat": "deutsch" },
+  "kontakt": { "email": "...@...", "telefon": "01..." }
+}
+```
+
+Der Assistent fragt nach Anrede, Vor- und Nachname, Geburtsname (optional),
+Anschrift, Land, Staatsangehörigkeit sowie E-Mail und Telefonnummer.
+**Geburtsdaten werden nicht abgefragt** – die braucht erst die eigentliche
+Anmeldung der Eheschließung beim Standesamt.
+
+Zum Scharfschalten in GitHub Actions:
+
+1. Secret `TK_PERSONENDATEN` mit dem JSON oben anlegen.
+2. Variable `TK_BUCHUNG_AKTIV` auf `1` setzen
+   (*Settings → Secrets and variables → Actions → Variables*).
+3. Optional abweichend einstellen: `TK_BUCHUNG_MONATE` (`2027-08`),
+   `TK_BUCHUNG_TRAUORTE` (`1210,1345`), `TK_BUCHUNG_WOCHENTAGE` (`samstag`).
+
+Der Buchungsschritt läuft nur bei **geplanten** Läufen, nicht bei manuell
+gestarteten – ein Testlauf von Hand kann also nichts auslösen.
+
+## Reservieren von Hand
 
 Der Monitor benachrichtigt nur – reserviert wird von Hand unter
 <https://traukalender.wiesbaden.de/de/Start-159.html>. Der Assistent fragt in
