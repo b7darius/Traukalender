@@ -1,18 +1,13 @@
 name: Traukalender-Monitor
 
-# Prueft halbstuendlich, ob im Traukalender Wiesbaden Termine im Zielmonat
-# freigeschaltet wurden.
-#
-# Zeitangabe in UTC: 05-21 UTC sind 07:00-23:00 deutscher Sommerzeit. Das ergibt
-# rund 34 Laeufe am Tag, also etwa 1.000 der 2.000 Actions-Minuten, die ein
-# privates Repository im Monat frei hat - mit Reserve. In einem oeffentlichen
-# Repository sind die Minuten unbegrenzt, dort kann der Takt gefahrlos auf
-# "*/15 * * * *" stehen.
+# Prueft alle 15 Minuten rund um die Uhr, ob im Traukalender Wiesbaden Termine
+# im Zielmonat freigeschaltet wurden. Das Repository ist oeffentlich, damit sind
+# die Actions-Minuten unbegrenzt und der Takt kostet nichts.
 #
 # Achtung: geplante Workflows laufen bei GitHub nur vom Standard-Branch aus.
 on:
   schedule:
-    - cron: "*/30 5-21 * * *"
+    - cron: "*/15 * * * *"
     # Montags ein Lebenszeichen aufs Handy, damit Stille nicht mit einem
     # stillgelegten Monitor verwechselt wird.
     - cron: "5 9 * * 1"

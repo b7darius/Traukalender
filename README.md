@@ -93,7 +93,7 @@ export TK_SMTP_PORT=587
 export TK_SMTP_USER=absender@gmail.com
 export TK_SMTP_PASS=app-passwort      # bei Gmail: App-Passwort, nicht das Kontopasswort
 export TK_MAIL_FROM=absender@gmail.com
-export TK_MAIL_TO=maike240300@gmail.com
+export TK_MAIL_TO=empfaenger@example.com
 ```
 
 ### Telegram
@@ -181,14 +181,17 @@ geht direkt aufs Handy und hängt an keiner Kontoeinstellung.
 * Läuft der Abruf für alle Trauorte auf einen Fehler, schlägt der Job fehl und
   GitHub schickt eine Fehler-Mail. Einzelne fehlgeschlagene Abfragen werden nur
   protokolliert.
-* **Kontingent:** private Repositories haben 2.000 Actions-Minuten im Monat,
-  öffentliche unbegrenzt viele. GitHub rechnet jeden Job auf volle Minuten auf,
-  ein Lauf kostet also rund eine Minute. Der eingestellte Takt
-  (`*/30 5-21 * * *`, rund 34 Läufe am Tag) verbraucht etwa 1.000 Minuten im
-  Monat und passt damit dauerhaft ins Kontingent eines privaten Repositorys.
-  Ein Takt von 15 Minuten rund um die Uhr wären ~2.900 Minuten – das reicht
-  nicht. Wer schneller prüfen will, macht das Repository öffentlich (es liegen
-  keine persönlichen Daten darin) und setzt den Takt auf `*/15 * * * *`.
+* **Kontingent:** öffentliche Repositories haben unbegrenzte Actions-Minuten,
+  deshalb steht der Takt auf `*/15 * * * *` – alle 15 Minuten rund um die Uhr.
+  Wird das Repository wieder auf privat gestellt, gilt ein Kontingent von 2.000
+  Minuten im Monat; GitHub rechnet jeden Job auf volle Minuten auf, ein Lauf
+  kostet also rund eine Minute. Dann passt dieser Takt (~2.900 Minuten) nicht
+  mehr und sollte auf etwa `*/30 5-21 * * *` (~1.000 Minuten) zurückgestellt
+  werden.
+* **Keine persönlichen Daten im Repository.** Der Monitor braucht für die
+  Kalenderabfrage weder Namen noch Adressen; Zugangsdaten für die
+  Benachrichtigung liegen ausschließlich in den Actions-Secrets. Das sollte so
+  bleiben, solange das Repository öffentlich ist.
 
 Alternativ lokal per cron:
 
