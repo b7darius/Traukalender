@@ -1,6 +1,6 @@
 {
   "diagnose": {
-    "reservierbar_bis": "2027-08-02",
+    "reservierbar_bis": "2027-08-01",
     "trauorte": {
       "1187": {
         "monate": {
@@ -62,5 +62,5 @@
     ]
   },
   "gemeldet": {},
-  "letzte_pruefung": "2026-08-02"
+  "letzte_pruefung": "2026-08-01"
 }
