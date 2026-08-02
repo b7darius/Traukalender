@@ -1,0 +1,94 @@
+name: Traukalender-Monitor
+
+# Prueft alle 15 Minuten, ob im Traukalender Wiesbaden Termine im Zielmonat
+# freigeschaltet wurden. Achtung: geplante Workflows laufen bei GitHub nur
+# vom Standard-Branch des Repositorys aus.
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Auch dann benachrichtigen, wenn schon gemeldet"
+        type: boolean
+        default: false
+
+concurrency:
+  group: traukalender-monitor
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  pruefen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Traukalender pruefen
+        id: check
+        env:
+          TK_MONATE: ${{ vars.TK_MONATE || '2027-08' }}
+          TK_TRAUORTE: ${{ vars.TK_TRAUORTE || 'alle' }}
+          TK_NTFY_SERVER: ${{ vars.TK_NTFY_SERVER }}
+          TK_NTFY_TOPIC: ${{ secrets.TK_NTFY_TOPIC }}
+          TK_NTFY_TOKEN: ${{ secrets.TK_NTFY_TOKEN }}
+          TK_SMTP_HOST: ${{ secrets.TK_SMTP_HOST }}
+          TK_SMTP_PORT: ${{ secrets.TK_SMTP_PORT }}
+          TK_SMTP_USER: ${{ secrets.TK_SMTP_USER }}
+          TK_SMTP_PASS: ${{ secrets.TK_SMTP_PASS }}
+          TK_MAIL_FROM: ${{ secrets.TK_MAIL_FROM }}
+          TK_MAIL_TO: ${{ secrets.TK_MAIL_TO }}
+          TK_TELEGRAM_TOKEN: ${{ secrets.TK_TELEGRAM_TOKEN }}
+          TK_TELEGRAM_CHAT: ${{ secrets.TK_TELEGRAM_CHAT }}
+          TK_WEBHOOK_URL: ${{ secrets.TK_WEBHOOK_URL }}
+        run: |
+          set +e
+          python traukalender_monitor.py \
+            --state state/state.json \
+            --bericht bericht.md \
+            ${{ inputs.force && '--force' || '' }}
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          if [ "$code" -eq 1 ]; then exit 1; fi
+          exit 0
+
+      - name: Zusammenfassung
+        if: always()
+        run: |
+          if [ -f bericht.md ]; then cat bericht.md >> "$GITHUB_STEP_SUMMARY"; fi
+
+      - name: Zustand zurueckschreiben
+        if: always()
+        run: |
+          git config user.name "traukalender-monitor"
+          git config user.email "actions@github.com"
+          git add -A state
+          if git diff --cached --quiet; then
+            echo "Kein neuer Zustand."
+          else
+            git commit -m "Zustand aktualisiert [skip ci]"
+            git push
+          fi
+
+      - name: Issue anlegen, wenn Termine frei sind
+        if: steps.check.outputs.exit_code == '10'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.existsSync('bericht.md')
+              ? fs.readFileSync('bericht.md', 'utf8')
+              : 'Termine gefunden - Details siehe Workflow-Log.';
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Traukalender: Termine freigeschaltet (${new Date().toISOString().slice(0,16)})`,
+              body: body + '\n\nReservieren: https://traukalender.wiesbaden.de/de/Start-159.html',
+            });
