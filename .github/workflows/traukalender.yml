@@ -15,6 +15,10 @@ on:
     - cron: "*/30 5-21 * * *"
   workflow_dispatch:
     inputs:
+      monate:
+        description: "Zielmonate JJJJ-MM, kommagetrennt (leer = Standard). Zum Testen z.B. 2027-07"
+        type: string
+        default: ""
       force:
         description: "Auch dann benachrichtigen, wenn schon gemeldet"
         type: boolean
@@ -41,7 +45,7 @@ jobs:
       - name: Traukalender pruefen
         id: check
         env:
-          TK_MONATE: ${{ vars.TK_MONATE || '2027-08' }}
+          TK_MONATE: ${{ inputs.monate || vars.TK_MONATE || '2027-08' }}
           TK_TRAUORTE: ${{ vars.TK_TRAUORTE || 'alle' }}
           TK_NTFY_SERVER: ${{ vars.TK_NTFY_SERVER }}
           TK_NTFY_TOPIC: ${{ secrets.TK_NTFY_TOPIC }}
@@ -57,8 +61,10 @@ jobs:
           TK_WEBHOOK_URL: ${{ secrets.TK_WEBHOOK_URL }}
         run: |
           set +e
+          # Ein Testlauf mit eigenem Zielmonat schreibt in eine Wegwerf-Datei,
+          # damit der echte Zustand der Ueberwachung unberuehrt bleibt.
           python traukalender_monitor.py \
-            --state state/state.json \
+            --state "${{ inputs.monate && '/tmp/testlauf-state.json' || 'state/state.json' }}" \
             --bericht bericht.md \
             ${{ inputs.force && '--force' || '' }}
           code=$?
