@@ -349,9 +349,21 @@ def kandidaten(
                 if nur_reservierbar and tag > max_portal:
                     continue
                 gefunden += tagesslots(sitzung, trauort, tag)
-    # Spaetester Termin zuerst: erst Datum, dann Uhrzeit.
-    gefunden.sort(key=lambda s: (s.datum, s.von), reverse=True)
+    # Jeder passende Tag ist recht, deshalb zaehlt zuerst der fruehestmoegliche
+    # Tag - so wird zugegriffen, sobald ueberhaupt etwas frei wird, statt auf
+    # ein spaeteres Datum zu warten, das nie kommen muss. Innerhalb eines Tages
+    # gewinnt die spaeteste Uhrzeit.
+    gefunden.sort(key=lambda s: (s.datum, _zeit_absteigend(s.von)))
     return gefunden
+
+
+def _zeit_absteigend(uhrzeit: str) -> int:
+    """Sortierschluessel, der spaetere Uhrzeiten nach vorne zieht."""
+    try:
+        stunde, minute = (int(x) for x in uhrzeit.split(":"))
+    except ValueError:
+        return 0
+    return -(stunde * 60 + minute)
 
 
 # --------------------------------------------------------------------------

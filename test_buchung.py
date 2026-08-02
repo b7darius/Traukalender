@@ -82,15 +82,22 @@ class Formularfelder(unittest.TestCase):
 
 
 class SlotSortierung(unittest.TestCase):
-    def test_spaetester_zuerst(self):
+    def test_fruehester_tag_darin_spaeteste_uhrzeit(self):
         s = [
             tb.Slot(1210, "2027-08-07", "10:00", "10:30"),
-            tb.Slot(1210, "2027-08-28", "09:00", "09:30"),
-            tb.Slot(1345, "2027-08-28", "17:00", "17:45"),
+            tb.Slot(1345, "2027-08-07", "16:00", "16:45"),
+            tb.Slot(1210, "2027-08-28", "17:00", "17:45"),
         ]
-        s.sort(key=lambda x: (x.datum, x.von), reverse=True)
-        self.assertEqual([(x.datum, x.von) for x in s],
-                         [("2027-08-28", "17:00"), ("2027-08-28", "09:00"), ("2027-08-07", "10:00")])
+        s.sort(key=lambda x: (x.datum, tb._zeit_absteigend(x.von)))
+        self.assertEqual(
+            [(x.datum, x.von) for x in s],
+            [("2027-08-07", "16:00"), ("2027-08-07", "10:00"), ("2027-08-28", "17:00")],
+        )
+
+    def test_uhrzeiten_werden_numerisch_verglichen(self):
+        # Textvergleich wuerde "9:30" hinter "17:00" einsortieren.
+        self.assertLess(tb._zeit_absteigend("17:00"), tb._zeit_absteigend("9:30"))
+        self.assertLess(tb._zeit_absteigend("17:45"), tb._zeit_absteigend("17:00"))
 
     def test_beschreibung_ist_lesbar(self):
         s = tb.Slot(1210, "2027-08-28", "17:00", "17:45")
