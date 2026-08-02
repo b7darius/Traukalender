@@ -26,6 +26,10 @@ on:
         description: "Auch dann benachrichtigen, wenn schon gemeldet"
         type: boolean
         default: false
+      heartbeat:
+        description: "Lebenszeichen senden, auch wenn nichts gefunden wurde"
+        type: boolean
+        default: false
 
 concurrency:
   group: traukalender-monitor
@@ -69,7 +73,7 @@ jobs:
           python traukalender_monitor.py \
             --state "${{ inputs.monate && '/tmp/testlauf-state.json' || 'state/state.json' }}" \
             --bericht bericht.md \
-            ${{ github.event.schedule == '5 9 * * 1' && '--heartbeat' || '' }} \
+            ${{ (inputs.heartbeat || github.event.schedule == '5 9 * * 1') && '--heartbeat' || '' }} \
             ${{ inputs.force && '--force' || '' }}
           code=$?
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
