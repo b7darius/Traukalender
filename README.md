@@ -119,12 +119,14 @@ ist der Meldeweg, der immer funktioniert. Push aufs Handy kommt über ntfy dazu.
 
 **Einrichtung**
 
-1. *Actions → Traukalender-Monitor → Enable workflow*, falls GitHub den Workflow
-   noch nicht aktiviert hat. Mit *Run workflow* lässt sich sofort ein Testlauf
-   starten.
-2. *Settings → Actions → General → Workflow permissions* auf **Read and write
-   permissions** stellen. Ohne das kann der Lauf den Zustand nicht zurückschreiben
-   und würde bei jedem Fund erneut melden.
+1. Der Workflow ist aktiv und wurde getestet: ein Lauf dauert rund 30 Sekunden
+   und schreibt den Zustand selbstständig ins Repository zurück. Über
+   *Actions → Traukalender-Monitor → Run workflow* lässt sich jederzeit von Hand
+   ein Lauf starten.
+2. Falls der Schritt „Zustand zurueckschreiben" irgendwann eine Warnung zeigt:
+   *Settings → Actions → General → Workflow permissions* auf **Read and write
+   permissions** stellen. Ohne Schreibrecht würde der Monitor bei jedem Lauf
+   erneut denselben Fund melden.
 3. Push aufs Handy: unter *Settings → Secrets and variables → Actions → Secrets*
    ein Secret `TK_NTFY_TOPIC` mit dem selbst gewählten ntfy-Topic anlegen.
    Weitere optionale Secrets: `TK_NTFY_TOKEN`, `TK_SMTP_HOST`, `TK_SMTP_PORT`,
