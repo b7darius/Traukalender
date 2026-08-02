@@ -254,8 +254,12 @@ Die Tests laufen offline gegen eine Attrappe des Endpunkts.
 
 `traukalender_buchung.py` kann den Termin auch selbst reservieren, sobald einer
 frei wird. Voreingestellt: **Samstage im August 2027**, ausschließlich **Kurhaus**
-oder **Wiesbadener Casino-Gesellschaft**, und davon der **spätestmögliche**
-Termin – erst das späteste Datum, innerhalb des Tages die späteste Uhrzeit.
+oder **Wiesbadener Casino-Gesellschaft**.
+
+Ausgewählt wird der **frühestmögliche Samstag** und darin die **späteste
+Uhrzeit**. Jeder Samstag ist recht, deshalb wird zugegriffen, sobald überhaupt
+etwas frei wird, statt auf ein späteres Datum zu warten, das nie kommen muss.
+Sind an einem Tag mehrere Zeiten frei, gewinnt die späteste.
 
 > **Eine Reservierung ist verbindlich.** Sie wird beim Standesamt hinterlegt und
 > lässt sich per Skript nicht zurücknehmen, sondern nur telefonisch oder per
@@ -277,8 +281,13 @@ python3 traukalender_buchung.py --wochentage samstag,freitag --trauorte 1210
 
 ### Sicherungen
 
-* **Zwei Schalter.** Ohne `--wirklich-buchen` *und* `TK_BUCHUNG_AKTIV=1` wird
-  nie reserviert. Beides wird geprüft, bevor überhaupt gesucht wird.
+* **Kommandozeile bucht nie von allein.** Ohne `--wirklich-buchen` *und*
+  `TK_BUCHUNG_AKTIV=1` wird nie reserviert. Beides wird geprüft, bevor
+  überhaupt gesucht wird.
+* **In Actions ist das Secret die Freigabe.** Der Buchungsschritt läuft nur,
+  wenn `TK_PERSONENDATEN` hinterlegt ist – dieses Secret anzulegen *ist* die
+  bewusste Scharfschaltung. Notbremse ohne Löschen des Secrets: Variable
+  `TK_BUCHUNG_AKTIV` auf `0` setzen.
 * **Nur einmal.** Nach einer erfolgreichen Reservierung liegt `state/gebucht.json`
   im Repository. Solange die Datei existiert, unternimmt das Skript nichts mehr.
 * **Nie doppelt abschicken.** Der Weg bis zur Bestätigungsseite wird bei
@@ -314,13 +323,13 @@ Anschrift, Land, Staatsangehörigkeit sowie E-Mail und Telefonnummer.
 **Geburtsdaten werden nicht abgefragt** – die braucht erst die eigentliche
 Anmeldung der Eheschließung beim Standesamt.
 
-Zum Scharfschalten in GitHub Actions:
+Zum Scharfschalten in GitHub Actions genügt **ein Schritt**: das Secret
+`TK_PERSONENDATEN` mit dem JSON oben anlegen. Ab dem nächsten geplanten Lauf
+wird reserviert, sobald ein passender Termin frei ist.
 
-1. Secret `TK_PERSONENDATEN` mit dem JSON oben anlegen.
-2. Variable `TK_BUCHUNG_AKTIV` auf `1` setzen
-   (*Settings → Secrets and variables → Actions → Variables*).
-3. Optional abweichend einstellen: `TK_BUCHUNG_MONATE` (`2027-08`),
-   `TK_BUCHUNG_TRAUORTE` (`1210,1345`), `TK_BUCHUNG_WOCHENTAGE` (`samstag`).
+Optional abweichend einstellen (als *Variables*): `TK_BUCHUNG_MONATE`
+(`2027-08`), `TK_BUCHUNG_TRAUORTE` (`1210,1345`), `TK_BUCHUNG_WOCHENTAGE`
+(`samstag`). Zum Abschalten `TK_BUCHUNG_AKTIV` auf `0` setzen.
 
 Der Buchungsschritt läuft nur bei **geplanten** Läufen, nicht bei manuell
 gestarteten – ein Testlauf von Hand kann also nichts auslösen.

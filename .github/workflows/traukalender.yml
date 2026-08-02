@@ -37,6 +37,11 @@ permissions:
 jobs:
   pruefen:
     runs-on: ubuntu-latest
+    # Auf Job-Ebene, damit der Buchungsschritt in seiner eigenen if-Bedingung
+    # pruefen kann, ob die Personendaten hinterlegt sind. Secrets sind in
+    # if-Bedingungen nicht direkt lesbar, ueber env dagegen schon.
+    env:
+      TK_PERSONENDATEN: ${{ secrets.TK_PERSONENDATEN }}
     steps:
       - uses: actions/checkout@v4
 
@@ -86,13 +91,21 @@ jobs:
             echo "Kein Bericht erzeugt - siehe Log des Pruefschritts." >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      # Automatische Reservierung. Laeuft nur, wenn die Variable
-      # TK_BUCHUNG_AKTIV auf 1 steht - ohne sie bricht das Skript selbst dann
-      # ab, wenn dieser Schritt versehentlich ausgeloest wird. Die Datei
-      # state/gebucht.json verhindert eine zweite Reservierung.
+      # Automatische Reservierung.
+      #
+      # Scharf ist sie genau dann, wenn das Secret TK_PERSONENDATEN hinterlegt
+      # ist - dieses Secret anzulegen ist die bewusste Freigabe. Zusaetzlich
+      # laeuft der Schritt nur bei geplanten Laeufen, damit ein Testlauf von
+      # Hand nichts ausloesen kann, und state/gebucht.json verhindert eine
+      # zweite Reservierung.
+      #
+      # Notbremse ohne Loeschen des Secrets: Variable TK_BUCHUNG_AKTIV auf 0.
       - name: Automatisch reservieren
         id: buchung
-        if: vars.TK_BUCHUNG_AKTIV == '1' && github.event_name == 'schedule'
+        if: >-
+          github.event_name == 'schedule'
+          && env.TK_PERSONENDATEN != ''
+          && vars.TK_BUCHUNG_AKTIV != '0'
         env:
           TK_BUCHUNG_AKTIV: "1"
           TK_BUCHUNG_MONATE: ${{ vars.TK_BUCHUNG_MONATE || '2027-08' }}
