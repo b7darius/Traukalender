@@ -671,7 +671,13 @@ def main(argv: list[str] | None = None) -> int:
         "zeitpunkt": dt.datetime.now().astimezone().isoformat(timespec="seconds"),
         "bestaetigung": ergebnis.get("bestaetigung", {}),
     }
-    buchungszustand_speichern(args.state, zustand)
+    # Zuerst den Zustand festhalten - er ist die Bremse gegen eine zweite
+    # Reservierung. Scheitert das Schreiben, muss die Benachrichtigung
+    # trotzdem raus, sonst bliebe eine echte Buchung unbemerkt.
+    try:
+        buchungszustand_speichern(args.state, zustand)
+    except OSError as err:
+        print(f"[fehler] Zustand konnte nicht gespeichert werden: {err}", file=sys.stderr)
 
     titel = f"Trautermin reserviert: {ziel.beschreibung()}"
     text = "\n".join([
@@ -687,7 +693,12 @@ def main(argv: list[str] | None = None) -> int:
     ])
     print("\n" + titel + "\n" + text)
     kanaele = benachrichtigen(titel, text, cfg)
-    print(f"[info] benachrichtigt ueber: {', '.join(kanaele) or 'keinen Kanal'}")
+    if kanaele:
+        print(f"[info] benachrichtigt ueber: {', '.join(kanaele)}")
+    else:
+        print("[warn] Kein Benachrichtigungskanal erreichbar. Die Reservierung "
+              "steht trotzdem - siehe Ausgabe oben und state/gebucht.json.",
+              file=sys.stderr)
     return EXIT_GEBUCHT
 
 

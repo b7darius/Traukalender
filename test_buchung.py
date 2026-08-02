@@ -200,6 +200,51 @@ class Sicherungen(unittest.TestCase):
         self.assertEqual(code, tb.EXIT_ERROR)
         kandidaten.assert_not_called()
 
+    def _erfolgreiche_buchung_simulieren(self, tmp, speichern_faellt_aus=False):
+        slot = tb.Slot(1210, "2027-08-07", "16:00", "16:45", termin_id="7")
+        gesendet = []
+        umgebung = {
+            "TK_BUCHUNG_AKTIV": "1",
+            "TK_PERSONENDATEN": json.dumps({
+                "partner1": {"vorname": "A", "name": "B", "strasse": "W 1",
+                             "plz": "1", "ort": "O"},
+                "partner2": {"vorname": "C", "name": "D", "strasse": "W 1",
+                             "plz": "1", "ort": "O"},
+                "kontakt": {"email": "a@b.de", "telefon": "0123"},
+            }),
+        }
+        with mock.patch.dict(os.environ, umgebung, clear=True), \
+             mock.patch.object(tb, "kandidaten", return_value=[slot]), \
+             mock.patch.object(tb, "buchen", return_value={
+                 "gebucht": True, "slot": slot.als_dict(),
+                 "bestaetigung": {"titel": "Bestaetigung", "vorgangsnummer": "X-1"}}), \
+             mock.patch.object(tb, "benachrichtigen",
+                               side_effect=lambda t, x, c: gesendet.append(t) or ["ntfy"]), \
+             mock.patch.object(
+                 tb, "buchungszustand_speichern",
+                 side_effect=(OSError("Platte voll") if speichern_faellt_aus else None)):
+            code = tb.main(["--wirklich-buchen", "--state",
+                            os.path.join(tmp, "gebucht.json")])
+        return code, gesendet
+
+    def test_erfolg_meldet_und_endet_mit_code_20(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            code, gesendet = self._erfolgreiche_buchung_simulieren(tmp)
+        self.assertEqual(code, tb.EXIT_GEBUCHT)
+        self.assertEqual(len(gesendet), 1)
+        self.assertIn("reserviert", gesendet[0])
+
+    def test_meldung_kommt_auch_wenn_zustand_nicht_schreibbar_ist(self):
+        """Eine echte Reservierung darf nie unbemerkt bleiben, nur weil die
+        Zustandsdatei nicht geschrieben werden konnte."""
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            code, gesendet = self._erfolgreiche_buchung_simulieren(
+                tmp, speichern_faellt_aus=True)
+        self.assertEqual(code, tb.EXIT_GEBUCHT)
+        self.assertEqual(len(gesendet), 1)
+
     def test_bereits_gebucht_unternimmt_nichts(self):
         import tempfile
         with tempfile.TemporaryDirectory() as tmp:

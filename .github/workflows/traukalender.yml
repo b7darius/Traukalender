@@ -33,6 +33,8 @@ concurrency:
 permissions:
   contents: write
   issues: write
+  # Noetig, um den Workflow nach einer Reservierung selbst abzuschalten.
+  actions: write
 
 jobs:
   pruefen:
@@ -100,12 +102,36 @@ jobs:
       # zweite Reservierung.
       #
       # Notbremse ohne Loeschen des Secrets: Variable TK_BUCHUNG_AKTIV auf 0.
+      # Zweite, vom Git-Push unabhaengige Bremse. state/gebucht.json wird zwar
+      # zurueckgeschrieben, aber dieser Push kann scheitern. Ein Issue mit der
+      # Kennung unten bleibt auch dann bestehen und verhindert eine zweite
+      # Reservierung.
+      - name: Pruefen, ob schon reserviert wurde
+        id: schon_gebucht
+        if: >-
+          github.event_name == 'schedule'
+          && env.TK_PERSONENDATEN != ''
+          && vars.TK_BUCHUNG_AKTIV != '0'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const alle = await github.paginate(github.rest.issues.listForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'all',
+              per_page: 100,
+            });
+            const gebucht = alle.some(i => (i.body || '').includes('<!-- traukalender:gebucht -->'));
+            core.setOutput('gebucht', gebucht ? 'ja' : 'nein');
+            if (gebucht) core.info('Es existiert bereits ein Reservierungs-Issue.');
+
       - name: Automatisch reservieren
         id: buchung
         if: >-
           github.event_name == 'schedule'
           && env.TK_PERSONENDATEN != ''
           && vars.TK_BUCHUNG_AKTIV != '0'
+          && steps.schon_gebucht.outputs.gebucht == 'nein'
         env:
           TK_BUCHUNG_AKTIV: "1"
           TK_BUCHUNG_MONATE: ${{ vars.TK_BUCHUNG_MONATE || '2027-08' }}
@@ -203,14 +229,18 @@ jobs:
             });
             core.info(`Issue #${issue.data.number} angelegt.`);
 
-      - name: Issue anlegen, wenn reserviert wurde
+      # Nach einer Reservierung ist die Aufgabe erledigt. Issue anlegen und den
+      # Workflow abschalten - das wirkt sofort und unabhaengig davon, ob der
+      # Zustands-Push geklappt hat. Damit kann kein zweiter Termin gebucht
+      # werden. Wieder einschalten: Actions -> Traukalender-Monitor -> Enable.
+      - name: Reservierung melden und Workflow abschalten
         if: steps.buchung.outputs.exit_code == '20'
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
             const zustand = JSON.parse(fs.readFileSync('state/gebucht.json', 'utf8'));
-            await github.rest.issues.create({
+            const issue = await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
               title: `Trautermin reserviert: ${zustand.beschreibung}`,
@@ -221,6 +251,15 @@ jobs:
                 '```',
                 'Die Bestaetigung des Standesamts kommt per E-Mail.',
                 'Aenderungen oder Absage nur direkt beim Standesamt Wiesbaden.',
+                'Der Workflow wurde abgeschaltet, es wird nichts weiter gebucht.',
+                '<!-- traukalender:gebucht -->',
               ].join('\n\n'),
               assignees: [context.repo.owner],
             });
+            core.info(`Issue #${issue.data.number} angelegt.`);
+            await github.rest.actions.disableWorkflow({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'traukalender.yml',
+            });
+            core.info('Workflow abgeschaltet - keine weiteren Laeufe, keine zweite Buchung.');

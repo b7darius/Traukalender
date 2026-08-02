@@ -288,8 +288,21 @@ python3 traukalender_buchung.py --wochentage samstag,freitag --trauorte 1210
   wenn `TK_PERSONENDATEN` hinterlegt ist – dieses Secret anzulegen *ist* die
   bewusste Scharfschaltung. Notbremse ohne Löschen des Secrets: Variable
   `TK_BUCHUNG_AKTIV` auf `0` setzen.
-* **Nur einmal.** Nach einer erfolgreichen Reservierung liegt `state/gebucht.json`
-  im Repository. Solange die Datei existiert, unternimmt das Skript nichts mehr.
+* **Nur einmal – dreifach abgesichert.** Nach einer erfolgreichen Reservierung
+  greifen drei voneinander unabhängige Bremsen:
+  1. `state/gebucht.json` liegt im Repository; solange sie existiert, unternimmt
+     das Skript nichts mehr.
+  2. Das Reservierungs-Issue trägt eine Kennung im Text. Vor jeder Buchung wird
+     geprüft, ob es existiert – das wirkt auch dann, wenn der Push der
+     Zustandsdatei einmal fehlschlägt.
+  3. Der Workflow **schaltet sich selbst ab**. Danach läuft gar nichts mehr,
+     bis er unter *Actions → Traukalender-Monitor → Enable workflow* wieder
+     eingeschaltet wird.
+* **Die Meldung geht immer raus.** Der Zustand wird vor der Benachrichtigung
+  geschrieben; schlägt das Schreiben fehl, wird trotzdem benachrichtigt. Eine
+  echte Reservierung soll nie unbemerkt bleiben. Zusätzlich zur Push-Nachricht
+  entsteht ein Issue mit allen Daten, und die Zusammenfassung des Laufs enthält
+  die Bestätigung.
 * **Nie doppelt abschicken.** Der Weg bis zur Bestätigungsseite wird bei
   Fehlern wiederholt – das Portal lehnt Formulare gelegentlich grundlos ab. Das
   Absenden selbst wird **nie** wiederholt: Ein fehlgeschlagenes Absenden könnte
