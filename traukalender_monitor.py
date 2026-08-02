@@ -535,6 +535,29 @@ def bericht_schreiben(pfad: str, titel: str, text: str) -> None:
         fh.write(f"# {titel}\n\n```\n{text}\n```\n")
 
 
+def statusbericht(diagnose: dict[str, Any], fehler: list[str]) -> tuple[str, str]:
+    """Kurzer Statustext fuer Laeufe ohne Fund - beantwortet die Frage
+    'laeuft die Ueberwachung ueberhaupt noch und worauf?'."""
+    monate = ", ".join(diagnose.get("zielmonate", []))
+    titel = f"Traukalender-Monitor laeuft - {monate} noch ohne Termine"
+    zeilen = [
+        f"Beobachtet: {monate}",
+        f"Geprueft am: {diagnose.get('geprueft_am', '?')}",
+        f"Reservierbar aktuell bis: {diagnose.get('reservierbar_bis', '?')}",
+        "",
+        "Stand je Trauort:",
+    ]
+    for trauort_id, info in diagnose.get("trauorte", {}).items():
+        teile = [
+            f"{monat}: {len(werte['angelegt'])} Tag(e)"
+            for monat, werte in info.get("monate", {}).items()
+        ]
+        zeilen.append(f"* {info.get('name', trauort_id)} - {', '.join(teile)}")
+    if fehler:
+        zeilen += ["", "Fehler bei einzelnen Abfragen:"] + [f"* {f}" for f in fehler]
+    return titel, "\n".join(zeilen)
+
+
 def marker_bauen(treffer: list[Treffer]) -> str:
     """Stabile Kennung der gemeldeten Tage.
 
@@ -601,6 +624,12 @@ def durchlauf(args: argparse.Namespace, cfg: dict[str, str]) -> int:
         if not args.force:
             als_gemeldet_merken(zustand, zu_melden)
     else:
+        titel, text = statusbericht(diagnose, fehler)
+        if args.bericht:
+            bericht_schreiben(args.bericht, titel, text)
+        if args.heartbeat:
+            kanaele = benachrichtigen(titel, text, cfg)
+            print(f"[info] Lebenszeichen verschickt ueber: {', '.join(kanaele) or 'keinen Kanal'}")
         github_output_setzen(False, "")
 
     # Bewusst nur tagesgenau: die Zustandsdatei wird im GitHub-Workflow ins
@@ -665,7 +694,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--ohne-uhrzeiten", action="store_true",
                         help="keine Uhrzeiten je Tag nachladen (schneller)")
     parser.add_argument("--bericht", default=os.environ.get("TK_BERICHT", ""),
-                        help="Markdown-Bericht in diese Datei schreiben, wenn etwas gefunden wurde")
+                        help="Markdown-Bericht in diese Datei schreiben (bei Fund die Meldung, "
+                             "sonst den aktuellen Stand)")
+    parser.add_argument("--heartbeat", action="store_true",
+                        help="auch ohne Fund ein Lebenszeichen ueber die Benachrichtigungskanaele "
+                             "schicken - zeigt, dass die Ueberwachung noch laeuft")
     parser.add_argument("--test-notify", action="store_true",
                         help="Testnachricht ueber alle konfigurierten Kanaele senden")
     parser.add_argument("--heute", default="", help="Datum ueberschreiben (JJJJ-MM-TT), fuer Tests")

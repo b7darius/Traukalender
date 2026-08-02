@@ -104,6 +104,29 @@ class Nachricht(unittest.TestCase):
         self.assertIn("ausserhalb der 12-Monats-Frist", text)
 
 
+class Statusbericht(unittest.TestCase):
+    def test_nennt_monat_und_stand_je_trauort(self):
+        diagnose = {
+            "zielmonate": ["2027-08"],
+            "reservierbar_bis": "2027-08-02",
+            "geprueft_am": "2026-08-02T11:00:00+00:00",
+            "trauorte": {
+                "1187": {"name": "Altes Rathaus",
+                         "monate": {"2027-08": {"angelegt": [], "reservierbar": []}}},
+            },
+        }
+        titel, text = tm.statusbericht(diagnose, [])
+        self.assertIn("2027-08", titel)
+        self.assertIn("laeuft", titel)
+        self.assertIn("Altes Rathaus", text)
+        self.assertIn("2027-08-02", text)
+
+    def test_fehler_tauchen_im_status_auf(self):
+        diagnose = {"zielmonate": ["2027-08"], "trauorte": {}}
+        _, text = tm.statusbericht(diagnose, ["Kurhaus 2027-08: Netzwerk weg"])
+        self.assertIn("Kurhaus 2027-08: Netzwerk weg", text)
+
+
 class ApiMitAttrappe(unittest.TestCase):
     """pruefen() gegen eine Attrappe des AJAX-Endpunkts."""
 

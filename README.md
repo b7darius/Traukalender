@@ -154,6 +154,18 @@ beides löst auch bei der Standardeinstellung „Participating and @mentions" ei
 Benachrichtigung aus. Verlässlicher als jede E-Mail ist trotzdem ntfy: der Push
 geht direkt aufs Handy und hängt an keiner Kontoeinstellung.
 
+**Woran man sieht, dass die Überwachung läuft**
+
+* *Actions → Traukalender-Monitor* zeigt die Liste der Läufe. Jeder Lauf schreibt
+  eine **Zusammenfassung**, auch wenn nichts gefunden wurde: welcher Monat
+  beobachtet wird, bis wann aktuell reserviert werden kann und der Stand je
+  Trauort.
+* **Montags um 11:05 deutscher Zeit** kommt ein Lebenszeichen aufs Handy
+  („Monitor läuft – 2027-08 noch ohne Termine"). Bleibt es zweimal aus, stimmt
+  etwas nicht.
+* `state/state.json` im Repository enthält den letzten Stand samt Datum der
+  letzten Prüfung.
+
 **Was beim Dauerbetrieb sonst noch zählt**
 
 * Geplante Workflows laufen nur vom **Standard-Branch** des Repositorys.

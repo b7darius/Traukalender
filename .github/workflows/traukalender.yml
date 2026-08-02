@@ -13,6 +13,9 @@ name: Traukalender-Monitor
 on:
   schedule:
     - cron: "*/30 5-21 * * *"
+    # Montags ein Lebenszeichen aufs Handy, damit Stille nicht mit einem
+    # stillgelegten Monitor verwechselt wird.
+    - cron: "5 9 * * 1"
   workflow_dispatch:
     inputs:
       monate:
@@ -66,16 +69,23 @@ jobs:
           python traukalender_monitor.py \
             --state "${{ inputs.monate && '/tmp/testlauf-state.json' || 'state/state.json' }}" \
             --bericht bericht.md \
+            ${{ github.event.schedule == '5 9 * * 1' && '--heartbeat' || '' }} \
             ${{ inputs.force && '--force' || '' }}
           code=$?
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
           if [ "$code" -eq 1 ]; then exit 1; fi
           exit 0
 
+      # Der Bericht wird bei jedem Lauf geschrieben, auch ohne Fund. So zeigt
+      # die Zusammenfassung jedes Laufs schwarz auf weiss, was geprueft wurde.
       - name: Zusammenfassung
         if: always()
         run: |
-          if [ -f bericht.md ]; then cat bericht.md >> "$GITHUB_STEP_SUMMARY"; fi
+          if [ -f bericht.md ]; then
+            cat bericht.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Kein Bericht erzeugt - siehe Log des Pruefschritts." >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       # Der Zustand verhindert Doppelmeldungen. Er aendert sich hoechstens
       # einmal am Tag, dieser Commit haelt zugleich das Repository aktiv -
