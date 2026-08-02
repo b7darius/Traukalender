@@ -106,8 +106,10 @@ jobs:
                "'Read and write permissions' aktivieren."
           exit 1
 
-      # Zweiter, von Secrets unabhaengiger Meldeweg: GitHub verschickt zu einem
-      # neuen Issue automatisch eine E-Mail an den Repository-Besitzer.
+      # Zweiter, von Secrets unabhaengiger Meldeweg. Das Issue wird dem Besitzer
+      # zugewiesen und erwaehnt ihn im Text: nur "Watching" auf "All Activity"
+      # wuerde eine Mail ausloesen, Zuweisung und @-Erwaehnung dagegen auch bei
+      # der Standardeinstellung "Participating and @mentions".
       - name: Issue anlegen, wenn Termine frei sind
         if: steps.check.outputs.exit_code == '10'
         uses: actions/github-script@v7
@@ -128,14 +130,17 @@ jobs:
             const bericht = fs.existsSync('bericht.md')
               ? fs.readFileSync('bericht.md', 'utf8')
               : 'Termine gefunden - Details siehe Workflow-Log.';
+            const besitzer = context.repo.owner;
             const issue = await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
               title: `Traukalender: Termine freigeschaltet (${new Date().toISOString().slice(0, 10)})`,
               body: [
+                `@${besitzer} - im Traukalender sind Termine frei geworden.`,
                 bericht,
                 'Reservieren: https://traukalender.wiesbaden.de/de/Start-159.html',
                 marker,
               ].join('\n\n'),
+              assignees: [besitzer],
             });
             core.info(`Issue #${issue.data.number} angelegt.`);
