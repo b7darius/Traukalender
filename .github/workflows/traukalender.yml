@@ -102,6 +102,14 @@ jobs:
       # zweite Reservierung.
       #
       # Notbremse ohne Loeschen des Secrets: Variable TK_BUCHUNG_AKTIV auf 0.
+      # Prueft bei jedem Lauf, ob die hinterlegten Personendaten vollstaendig
+      # sind. Ein Tippfehler im Secret faellt so sofort auf und nicht erst in
+      # dem Moment, in dem ein Termin frei wird. Ausgegeben wird nur, welche
+      # Felder fehlen - nie deren Inhalt, die Protokolle sind oeffentlich.
+      - name: Personendaten pruefen
+        if: env.TK_PERSONENDATEN != ''
+        run: python traukalender_buchung.py --pruefe-daten
+
       # Zweite, vom Git-Push unabhaengige Bremse. state/gebucht.json wird zwar
       # zurueckgeschrieben, aber dieser Push kann scheitern. Ein Issue mit der
       # Kennung unten bleibt auch dann bestehen und verhindert eine zweite

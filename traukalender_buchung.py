@@ -579,6 +579,32 @@ def wochentage_parsen(wert: str) -> set[int]:
     return tage
 
 
+def daten_pruefen() -> int:
+    """Prueft die hinterlegten Personendaten auf Vollstaendigkeit.
+
+    Gibt bewusst nur zurueck, welche Felder fehlen - niemals deren Inhalt.
+    Die Protokolle eines oeffentlichen Repositorys sind fuer jeden lesbar.
+    """
+    if not os.environ.get("TK_PERSONENDATEN", "").strip() and not os.environ.get("TK_P1_VORNAME"):
+        print("[fehler] Es sind keine Personendaten hinterlegt "
+              "(Secret TK_PERSONENDATEN fehlt).", file=sys.stderr)
+        return EXIT_ERROR
+    p1, p2, kontakt = personendaten_aus_umgebung()
+    fehlt = (["Person 1: " + f for f in p1.fehlend()]
+             + ["Person 2: " + f for f in p2.fehlend()]
+             + ["Kontakt: " + f for f in kontakt.fehlend()])
+    if fehlt:
+        print(f"[fehler] Unvollstaendige Personendaten: {', '.join(fehlt)}", file=sys.stderr)
+        return EXIT_ERROR
+    print("Personendaten sind vollstaendig:")
+    print(f"  Person 1: alle Pflichtfelder gesetzt, Anrede "
+          f"{'gesetzt' if p1.anrede else 'leer (optional)'}")
+    print(f"  Person 2: alle Pflichtfelder gesetzt, Anrede "
+          f"{'gesetzt' if p2.anrede else 'leer (optional)'}")
+    print("  Kontakt: E-Mail und Telefonnummer gesetzt")
+    return EXIT_OK
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Reserviert automatisch einen Trautermin in Wiesbaden.",
@@ -601,8 +627,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--timeout", type=int, default=30)
     parser.add_argument("--versuche", type=int, default=3,
                         help="Wiederholungen auf dem Weg zur Bestaetigungsseite")
+    parser.add_argument("--pruefe-daten", dest="pruefe_daten", action="store_true",
+                        help="nur pruefen, ob die hinterlegten Personendaten "
+                             "vollstaendig sind, und beenden")
     parser.add_argument("--heute", default="")
     args = parser.parse_args(argv)
+
+    if args.pruefe_daten:
+        return daten_pruefen()
 
     # Endzustand zuerst: ist bereits reserviert, wird nichts mehr unternommen,
     # egal wie der Rest konfiguriert ist.
@@ -618,6 +650,13 @@ def main(argv: list[str] | None = None) -> int:
         print("[fehler] --wirklich-buchen verlangt TK_BUCHUNG_AKTIV=1. Abbruch.",
               file=sys.stderr)
         return EXIT_ERROR
+
+    # Die Personendaten schon jetzt pruefen, nicht erst wenn ein Termin frei
+    # ist. Ein Tippfehler im Secret faellt sonst erst in dem einen Moment auf,
+    # in dem es darauf ankommt.
+    if args.wirklich or args.probe:
+        if daten_pruefen() != EXIT_OK:
+            return EXIT_ERROR
 
     heute = dt.date.fromisoformat(args.heute) if args.heute else dt.date.today()
     monate = monate_parsen(args.monate.split(","))
@@ -645,13 +684,6 @@ def main(argv: list[str] | None = None) -> int:
         return EXIT_OK
 
     p1, p2, kontakt = personendaten_aus_umgebung()
-    fehlt = (["Person 1: " + f for f in p1.fehlend()]
-             + ["Person 2: " + f for f in p2.fehlend()]
-             + ["Kontakt: " + f for f in kontakt.fehlend()])
-    if fehlt:
-        print(f"[fehler] Unvollstaendige Daten: {', '.join(fehlt)}", file=sys.stderr)
-        return EXIT_ERROR
-
     print(f"\nZiel: {ziel.beschreibung()}")
     try:
         ergebnis = buchen(ziel, p1, p2, kontakt, wirklich=args.wirklich,

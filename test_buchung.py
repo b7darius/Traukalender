@@ -81,6 +81,53 @@ class Formularfelder(unittest.TestCase):
         self.assertEqual(list(tb.formularfelder(f)), ["echt"])
 
 
+class DatenPruefung(unittest.TestCase):
+    VOLLSTAENDIG = {
+        "partner1": {"anrede": "frau", "vorname": "A", "name": "B",
+                     "strasse": "W 1", "plz": "1", "ort": "O"},
+        "partner2": {"anrede": "herr", "vorname": "C", "name": "D",
+                     "strasse": "W 1", "plz": "1", "ort": "O"},
+        "kontakt": {"email": "a@b.de", "telefon": "0123"},
+    }
+
+    def test_ohne_secret_fehler(self):
+        with mock.patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(tb.daten_pruefen(), tb.EXIT_ERROR)
+
+    def test_unvollstaendig_fehler(self):
+        roh = {"partner1": {"vorname": "A"}, "partner2": {}, "kontakt": {}}
+        with mock.patch.dict(os.environ, {"TK_PERSONENDATEN": json.dumps(roh)}, clear=True):
+            self.assertEqual(tb.daten_pruefen(), tb.EXIT_ERROR)
+
+    def test_vollstaendig_ok(self):
+        with mock.patch.dict(os.environ,
+                             {"TK_PERSONENDATEN": json.dumps(self.VOLLSTAENDIG)}, clear=True):
+            self.assertEqual(tb.daten_pruefen(), tb.EXIT_OK)
+
+    def test_gibt_keine_inhalte_preis(self):
+        """Die Protokolle eines oeffentlichen Repositorys sind fuer jeden
+        lesbar - es darf kein Name und keine Adresse darin auftauchen."""
+        import contextlib
+        import io
+        puffer = io.StringIO()
+        with mock.patch.dict(os.environ,
+                             {"TK_PERSONENDATEN": json.dumps(self.VOLLSTAENDIG)}, clear=True):
+            with contextlib.redirect_stdout(puffer):
+                tb.daten_pruefen()
+        ausgabe = puffer.getvalue()
+        for geheim in ("a@b.de", "0123", "W 1"):
+            self.assertNotIn(geheim, ausgabe)
+
+    def test_buchung_bricht_bei_luecken_vor_der_suche_ab(self):
+        umgebung = {"TK_BUCHUNG_AKTIV": "1",
+                    "TK_PERSONENDATEN": json.dumps({"partner1": {"vorname": "A"}})}
+        with mock.patch.dict(os.environ, umgebung, clear=True), \
+             mock.patch.object(tb, "kandidaten") as kandidaten:
+            code = tb.main(["--wirklich-buchen", "--state", "/nonexistent/gebucht.json"])
+        self.assertEqual(code, tb.EXIT_ERROR)
+        kandidaten.assert_not_called()
+
+
 class SlotSortierung(unittest.TestCase):
     def test_fruehester_tag_darin_spaeteste_uhrzeit(self):
         s = [
