@@ -111,20 +111,52 @@ export TK_WEBHOOK_URL=https://...   # bekommt JSON: {title, text, url}
 
 ## Dauerbetrieb per GitHub Actions
 
-`.github/workflows/traukalender.yml` prüft alle 15 Minuten, schreibt den Zustand
-ins Repository zurück und legt bei einem Treffer zusätzlich ein Issue an
-(GitHub schickt dafür automatisch eine E-Mail).
+`.github/workflows/traukalender.yml` prüft halbstündlich zwischen 07:00 und
+23:00 deutscher Zeit, schreibt den Zustand ins Repository zurück und legt bei
+einem Treffer zusätzlich ein Issue an.
+Der Workflow läuft ohne jede weitere Konfiguration – die Issue-Mail von GitHub
+ist der Meldeweg, der immer funktioniert. Push aufs Handy kommt über ntfy dazu.
 
-1. Workflow muss auf dem **Standard-Branch** liegen – GitHub führt geplante
-   Workflows nur von dort aus.
-2. Unter *Settings → Secrets and variables → Actions* eintragen, was gebraucht
-   wird: `TK_NTFY_TOPIC`, `TK_SMTP_HOST`, `TK_SMTP_PORT`, `TK_SMTP_USER`,
-   `TK_SMTP_PASS`, `TK_MAIL_FROM`, `TK_MAIL_TO`, `TK_TELEGRAM_TOKEN`,
-   `TK_TELEGRAM_CHAT`, `TK_WEBHOOK_URL`.
-   Der Zielmonat lässt sich als *Variable* `TK_MONATE` überschreiben.
-3. Zwei Eigenheiten von GitHub Actions: geplante Läufe verspäten sich bei Last
-   um einige Minuten, und in Repositories ohne Aktivität werden sie nach 60 Tagen
-   pausiert. Der Zustands-Commit jedes Laufs hält das Repository aktiv.
+**Einrichtung**
+
+1. *Actions → Traukalender-Monitor → Enable workflow*, falls GitHub den Workflow
+   noch nicht aktiviert hat. Mit *Run workflow* lässt sich sofort ein Testlauf
+   starten.
+2. *Settings → Actions → General → Workflow permissions* auf **Read and write
+   permissions** stellen. Ohne das kann der Lauf den Zustand nicht zurückschreiben
+   und würde bei jedem Fund erneut melden.
+3. Push aufs Handy: unter *Settings → Secrets and variables → Actions → Secrets*
+   ein Secret `TK_NTFY_TOPIC` mit dem selbst gewählten ntfy-Topic anlegen.
+   Weitere optionale Secrets: `TK_NTFY_TOKEN`, `TK_SMTP_HOST`, `TK_SMTP_PORT`,
+   `TK_SMTP_USER`, `TK_SMTP_PASS`, `TK_MAIL_FROM`, `TK_MAIL_TO`,
+   `TK_TELEGRAM_TOKEN`, `TK_TELEGRAM_CHAT`, `TK_WEBHOOK_URL`.
+   Der Zielmonat lässt sich als *Variable* `TK_MONATE` überschreiben
+   (Standard `2027-08`).
+4. *Settings → Notifications* prüfen, damit die Issue-Mails auch ankommen.
+
+**Was beim Dauerbetrieb sonst noch zählt**
+
+* Geplante Workflows laufen nur vom **Standard-Branch** des Repositorys.
+* GitHub pausiert geplante Workflows nach **60 Tagen ohne Repository-Aktivität**.
+  Deshalb speichert der Monitor Zeitstempel nur tagesgenau: der Zustand ändert
+  sich einmal pro Tag, das gibt genau einen Commit am Tag – genug, um das
+  Repository aktiv zu halten, ohne die Historie zuzumüllen.
+* Geplante Läufe verspäten sich bei hoher Last um einige Minuten. Bei einem
+  15-Minuten-Takt ist das unkritisch.
+* Doppelte Meldungen sind zweifach abgesichert: über die Zustandsdatei und über
+  eine Kennung im Issue-Text. Selbst wenn der Zustand einmal nicht gespeichert
+  werden kann, entsteht kein zweites Issue zum selben Fund.
+* Läuft der Abruf für alle Trauorte auf einen Fehler, schlägt der Job fehl und
+  GitHub schickt eine Fehler-Mail. Einzelne fehlgeschlagene Abfragen werden nur
+  protokolliert.
+* **Kontingent:** private Repositories haben 2.000 Actions-Minuten im Monat,
+  öffentliche unbegrenzt viele. GitHub rechnet jeden Job auf volle Minuten auf,
+  ein Lauf kostet also rund eine Minute. Der eingestellte Takt
+  (`*/30 5-21 * * *`, rund 34 Läufe am Tag) verbraucht etwa 1.000 Minuten im
+  Monat und passt damit dauerhaft ins Kontingent eines privaten Repositorys.
+  Ein Takt von 15 Minuten rund um die Uhr wären ~2.900 Minuten – das reicht
+  nicht. Wer schneller prüfen will, macht das Repository öffentlich (es liegen
+  keine persönlichen Daten darin) und setzt den Takt auf `*/15 * * * *`.
 
 Alternativ lokal per cron:
 

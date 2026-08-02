@@ -1,11 +1,18 @@
 name: Traukalender-Monitor
 
-# Prueft alle 15 Minuten, ob im Traukalender Wiesbaden Termine im Zielmonat
-# freigeschaltet wurden. Achtung: geplante Workflows laufen bei GitHub nur
-# vom Standard-Branch des Repositorys aus.
+# Prueft halbstuendlich, ob im Traukalender Wiesbaden Termine im Zielmonat
+# freigeschaltet wurden.
+#
+# Zeitangabe in UTC: 05-21 UTC sind 07:00-23:00 deutscher Sommerzeit. Das ergibt
+# rund 34 Laeufe am Tag, also etwa 1.000 der 2.000 Actions-Minuten, die ein
+# privates Repository im Monat frei hat - mit Reserve. In einem oeffentlichen
+# Repository sind die Minuten unbegrenzt, dort kann der Takt gefahrlos auf
+# "*/15 * * * *" stehen.
+#
+# Achtung: geplante Workflows laufen bei GitHub nur vom Standard-Branch aus.
 on:
   schedule:
-    - cron: "*/15 * * * *"
+    - cron: "*/30 5-21 * * *"
   workflow_dispatch:
     inputs:
       force:
@@ -64,31 +71,65 @@ jobs:
         run: |
           if [ -f bericht.md ]; then cat bericht.md >> "$GITHUB_STEP_SUMMARY"; fi
 
+      # Der Zustand verhindert Doppelmeldungen. Er aendert sich hoechstens
+      # einmal am Tag, dieser Commit haelt zugleich das Repository aktiv -
+      # GitHub pausiert geplante Workflows sonst nach 60 Tagen ohne Aktivitaet.
       - name: Zustand zurueckschreiben
         if: always()
+        continue-on-error: true
         run: |
           git config user.name "traukalender-monitor"
           git config user.email "actions@github.com"
           git add -A state
           if git diff --cached --quiet; then
             echo "Kein neuer Zustand."
-          else
-            git commit -m "Zustand aktualisiert [skip ci]"
-            git push
+            exit 0
           fi
+          git commit -m "Zustand aktualisiert [skip ci]"
+          for versuch in 1 2 3; do
+            if git push; then
+              echo "Zustand gespeichert."
+              exit 0
+            fi
+            echo "Push fehlgeschlagen (Versuch $versuch), hole Aenderungen ..."
+            git pull --rebase --autostash || true
+            sleep $((versuch * 5))
+          done
+          echo "::warning::Zustand konnte nicht gepusht werden. Bitte unter" \
+               "Settings -> Actions -> General -> Workflow permissions" \
+               "'Read and write permissions' aktivieren."
+          exit 1
 
+      # Zweiter, von Secrets unabhaengiger Meldeweg: GitHub verschickt zu einem
+      # neuen Issue automatisch eine E-Mail an den Repository-Besitzer.
       - name: Issue anlegen, wenn Termine frei sind
         if: steps.check.outputs.exit_code == '10'
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
-            const body = fs.existsSync('bericht.md')
-              ? fs.readFileSync('bericht.md', 'utf8')
-              : 'Termine gefunden - Details siehe Workflow-Log.';
-            await github.rest.issues.create({
+            const marker = `<!-- traukalender:${{ steps.check.outputs.marker }} -->`;
+            const offen = await github.paginate(github.rest.issues.listForRepo, {
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: `Traukalender: Termine freigeschaltet (${new Date().toISOString().slice(0,16)})`,
-              body: body + '\n\nReservieren: https://traukalender.wiesbaden.de/de/Start-159.html',
+              state: 'open',
+              per_page: 100,
             });
+            if (offen.some(issue => (issue.body || '').includes(marker))) {
+              core.info('Zu diesem Fund gibt es bereits ein offenes Issue.');
+              return;
+            }
+            const bericht = fs.existsSync('bericht.md')
+              ? fs.readFileSync('bericht.md', 'utf8')
+              : 'Termine gefunden - Details siehe Workflow-Log.';
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Traukalender: Termine freigeschaltet (${new Date().toISOString().slice(0, 10)})`,
+              body: [
+                bericht,
+                'Reservieren: https://traukalender.wiesbaden.de/de/Start-159.html',
+                marker,
+              ].join('\n\n'),
+            });
+            core.info(`Issue #${issue.data.number} angelegt.`);

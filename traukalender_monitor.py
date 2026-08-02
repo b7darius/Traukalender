@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import hashlib
 import json
 import os
 import re
@@ -534,13 +535,24 @@ def bericht_schreiben(pfad: str, titel: str, text: str) -> None:
         fh.write(f"# {titel}\n\n```\n{text}\n```\n")
 
 
-def github_output_setzen(gefunden: bool, titel: str) -> None:
+def marker_bauen(treffer: list[Treffer]) -> str:
+    """Stabile Kennung der gemeldeten Tage.
+
+    Damit erkennt der GitHub-Workflow, ob zu genau diesem Fund schon ein Issue
+    offen ist - auch dann, wenn die Zustandsdatei mal nicht gespeichert werden
+    konnte."""
+    schluessel = ";".join(sorted(f"{t.trauort}:{t.datum}" for t in treffer))
+    return hashlib.sha256(schluessel.encode("utf-8")).hexdigest()[:16]
+
+
+def github_output_setzen(gefunden: bool, titel: str, marker: str = "") -> None:
     pfad = os.environ.get("GITHUB_OUTPUT")
     if not pfad:
         return
     with open(pfad, "a", encoding="utf-8") as fh:
         fh.write(f"gefunden={'true' if gefunden else 'false'}\n")
         fh.write(f"titel={titel}\n")
+        fh.write(f"marker={marker}\n")
 
 
 # --------------------------------------------------------------------------
@@ -585,14 +597,19 @@ def durchlauf(args: argparse.Namespace, cfg: dict[str, str]) -> int:
         print(f"[info] benachrichtigt ueber: {', '.join(kanaele) or 'keinen Kanal'}")
         if args.bericht:
             bericht_schreiben(args.bericht, titel, text)
-        github_output_setzen(True, titel)
+        github_output_setzen(True, titel, marker_bauen(zu_melden))
         if not args.force:
             als_gemeldet_merken(zustand, zu_melden)
     else:
         github_output_setzen(False, "")
 
-    zustand["letzte_pruefung"] = diagnose["geprueft_am"]
-    zustand["diagnose"] = diagnose
+    # Bewusst nur tagesgenau: die Zustandsdatei wird im GitHub-Workflow ins
+    # Repository zurueckgeschrieben. Mit Uhrzeit gaebe es bei jedem Lauf einen
+    # Commit (alle 15 Minuten), tagesgenau bleibt es bei einem pro Tag - genug,
+    # damit GitHub die geplanten Laeufe nicht wegen Inaktivitaet pausiert.
+    persistierbar = {k: v for k, v in diagnose.items() if k != "geprueft_am"}
+    zustand["letzte_pruefung"] = diagnose["geprueft_am"][:10]
+    zustand["diagnose"] = persistierbar
     if fehler:
         zustand["letzte_fehler"] = fehler
     else:

@@ -67,6 +67,25 @@ class ZustandUndDedupe(unittest.TestCase):
             self.assertEqual(tm.zustand_laden(pfad), {"gemeldet": {}})
 
 
+class Marker(unittest.TestCase):
+    def test_stabil_und_reihenfolgeunabhaengig(self):
+        a = tm.Treffer(1187, "2027-08-14", True, [])
+        b = tm.Treffer(1210, "2027-08-21", False, [])
+        self.assertEqual(tm.marker_bauen([a, b]), tm.marker_bauen([b, a]))
+
+    def test_unterscheidet_verschiedene_funde(self):
+        a = tm.Treffer(1187, "2027-08-14", True, [])
+        c = tm.Treffer(1187, "2027-08-15", True, [])
+        self.assertNotEqual(tm.marker_bauen([a]), tm.marker_bauen([c]))
+
+    def test_unabhaengig_von_uhrzeiten(self):
+        """Uhrzeiten aendern sich, wenn andere reservieren - das darf kein
+        zweites Issue fuer denselben Tag ausloesen."""
+        a = tm.Treffer(1187, "2027-08-14", True, ["10:00 - 10:30"])
+        b = tm.Treffer(1187, "2027-08-14", True, ["11:00 - 11:30", "12:00 - 12:30"])
+        self.assertEqual(tm.marker_bauen([a]), tm.marker_bauen([b]))
+
+
 class Nachricht(unittest.TestCase):
     def test_titel_unterscheidet_buchbar(self):
         diagnose = {"zielmonate": ["2027-08"], "reservierbar_bis": "2027-08-02"}
