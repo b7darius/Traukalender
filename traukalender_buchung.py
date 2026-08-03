@@ -3,7 +3,7 @@
 
 Sucht in den konfigurierten Monaten nach Terminen an den gewuenschten
 Wochentagen in den gewuenschten Trauorten und reserviert den passendsten
-davon - standardmaessig den spaetestmoeglichen.
+davon: den fruehesten passenden Tag, darin die spaeteste Uhrzeit.
 
 ACHTUNG: Eine Reservierung ist verbindlich. Sie wird beim Standesamt
 Wiesbaden hinterlegt und laesst sich nicht per Skript zuruecknehmen, sondern
@@ -35,7 +35,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from html import unescape
 from typing import Any
 
@@ -112,10 +112,6 @@ class Slot:
     @property
     def trauort_name(self) -> str:
         return TRAUORTE.get(self.trauort, f"Trauort {self.trauort}")
-
-    @property
-    def kennung(self) -> str:
-        return f"{self.trauort}|{self.datum}|{self.von}"
 
     def beschreibung(self) -> str:
         return (f"{deutsches_datum(self.datum)}, {self.von} - {self.bis} Uhr, "
@@ -328,7 +324,7 @@ def kandidaten(
     heute: dt.date,
     nur_reservierbar: bool = True,
 ) -> list[Slot]:
-    """Alle passenden Termine, spaetester zuerst."""
+    """Alle passenden Termine, bester zuerst (fruehester Tag, spaeteste Uhrzeit)."""
     max_portal = plus_monate(heute, VORLAUF_MONATE).isoformat()
     gefunden: list[Slot] = []
     for trauort in trauorte:
@@ -509,7 +505,10 @@ def buchen(
         sitzung = Sitzung(timeout=timeout)
         try:
             bestaetigung_html = _bis_bestaetigungsseite(sitzung, slot, p1, p2, kontakt, pause)
-        except BuchungsFehler as err:
+        except Exception as err:
+            # Bewusst breit: vor dem Absenden ist Wiederholen immer sicher,
+            # und auch ein Netzwerkfehler (Timeout, DNS) darf weder den Lauf
+            # abbrechen noch den ausgewaehlten Termin blockiert lassen.
             sitzung.termin_freigeben()
             letzter = err
             print(f"[warn] Versuch {versuch}/{versuche} fehlgeschlagen: {err}", file=sys.stderr)
@@ -673,7 +672,7 @@ def main(argv: list[str] | None = None) -> int:
         print("Keine passenden Termine frei.")
         return EXIT_OK
 
-    print(f"{len(treffer)} passende(r) Termin(e), spaetester zuerst:")
+    print(f"{len(treffer)} passende(r) Termin(e), bester zuerst:")
     for slot in treffer[:10]:
         print(f"  {slot.beschreibung()}")
 

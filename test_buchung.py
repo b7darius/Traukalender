@@ -211,6 +211,41 @@ class BuchenAblauf(unittest.TestCase):
         # Jeder gescheiterte Versuch muss den Termin wieder freigeben.
         self.assertEqual(z["freigaben"], 2)
 
+    def test_netzwerkfehler_vor_dem_absenden_wird_wiederholt(self):
+        """Auch ein Nicht-BuchungsFehler (Timeout, DNS) darf den Lauf nicht
+        abbrechen und muss den gehaltenen Termin freigeben."""
+        import urllib.error
+
+        zaehler = {"bis": 0, "submit": 0, "freigaben": 0}
+
+        def bis_bestaetigung(sitzung, slot, p1, p2, kontakt, pause):
+            zaehler["bis"] += 1
+            sitzung.termin_gehalten = True
+            if zaehler["bis"] == 1:
+                raise urllib.error.URLError("Zeitueberschreitung")
+            return "<form name='buchung-bestaetigen'></form>"
+
+        def schritt5(sitzung, html):
+            zaehler["submit"] += 1
+            sitzung.termin_gehalten = False
+            return "<title>Bestaetigung</title> Vorgangsnummer: N-1"
+
+        def freigeben(self_):
+            if self_.termin_gehalten:
+                zaehler["freigaben"] += 1
+                self_.termin_gehalten = False
+
+        with mock.patch.object(tb, "_bis_bestaetigungsseite", bis_bestaetigung), \
+             mock.patch.object(tb, "_schritt5", schritt5), \
+             mock.patch.object(tb.Sitzung, "termin_freigeben", freigeben), \
+             mock.patch.object(tb.time, "sleep", lambda *_: None):
+            ergebnis = tb.buchen(self.slot, self.p1, self.p2, self.k,
+                                 wirklich=True, versuche=3)
+        self.assertTrue(ergebnis["gebucht"])
+        self.assertEqual(zaehler["bis"], 2)
+        self.assertEqual(zaehler["submit"], 1)
+        self.assertEqual(zaehler["freigaben"], 1)
+
     def test_kein_zweiter_versuch_nach_fehler_beim_absenden(self):
         """Das ist die wichtigste Zusicherung: ein fehlgeschlagenes Absenden
         koennte trotzdem angekommen sein - nie erneut abschicken."""
