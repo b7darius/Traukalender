@@ -85,6 +85,17 @@ jobs:
             echo "Kein Bericht erzeugt - siehe Log des Pruefschritts." >> "$GITHUB_STEP_SUMMARY"
           fi
 
+      # Macht sichtbar, warum der Buchungsschritt laeuft oder nicht. Ohne das
+      # ist ein uebersprungener Schritt in der Oberflaeche nicht von einem
+      # abgeschalteten zu unterscheiden. Enthaelt keine Geheimnisse - nur, ob
+      # die Personendaten gesetzt sind, nicht deren Inhalt.
+      - name: Buchungs-Gate protokollieren
+        run: |
+          echo "Ereignis:            ${{ github.event_name }} (Buchung nur bei 'schedule')"
+          echo "Personendaten da:    ${{ env.TK_PERSONENDATEN != '' }}"
+          echo "TK_BUCHUNG_AKTIV:    '${{ vars.TK_BUCHUNG_AKTIV }}' (leer = an, '0' = Notbremse)"
+          echo "Notbremse frei:      ${{ format('{0}', vars.TK_BUCHUNG_AKTIV) != '0' }}"
+
       # Prueft bei jedem Lauf, ob die hinterlegten Personendaten vollstaendig
       # sind. Ein Tippfehler im Secret faellt so sofort auf und nicht erst in
       # dem Moment, in dem ein Termin frei wird. Ausgegeben wird nur, welche
@@ -102,7 +113,7 @@ jobs:
         if: >-
           github.event_name == 'schedule'
           && env.TK_PERSONENDATEN != ''
-          && vars.TK_BUCHUNG_AKTIV != '0'
+          && format('{0}', vars.TK_BUCHUNG_AKTIV) != '0'
         uses: actions/github-script@v7
         with:
           script: |
@@ -129,7 +140,7 @@ jobs:
         if: >-
           github.event_name == 'schedule'
           && env.TK_PERSONENDATEN != ''
-          && vars.TK_BUCHUNG_AKTIV != '0'
+          && format('{0}', vars.TK_BUCHUNG_AKTIV) != '0'
           && steps.schon_gebucht.outputs.gebucht == 'nein'
         env:
           TK_BUCHUNG_AKTIV: "1"
