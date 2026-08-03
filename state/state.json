@@ -1,0 +1,31 @@
+{
+  "diagnose": {
+    "reservierbar_bis": "2027-08-03",
+    "trauorte": {
+      "1210": {
+        "monate": {
+          "2027-07": {
+            "angelegt": [],
+            "reservierbar": []
+          }
+        },
+        "name": "Kurhaus"
+      },
+      "1345": {
+        "monate": {
+          "2027-07": {
+            "angelegt": [],
+            "reservierbar": []
+          }
+        },
+        "name": "Wiesbadener Casino-Gesellschaft"
+      }
+    },
+    "wochentage": "Samstag",
+    "zielmonate": [
+      "2027-07"
+    ]
+  },
+  "gemeldet": {},
+  "letzte_pruefung": "2026-08-03"
+}
