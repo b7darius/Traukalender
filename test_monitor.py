@@ -247,6 +247,42 @@ class ApiMitAttrappe(unittest.TestCase):
         self.assertEqual(len(treffer), 2)
         self.assertEqual(diagnose["wochentage"], "alle Tage")
 
+    def test_meldung_nur_fuer_ausgewaehlte_trauorte(self):
+        """Alle Trauorte werden geprueft und ausgewiesen, aber nur die
+        ausgewaehlten loesen eine Meldung aus."""
+        tm.http_get = self.attrappe(["2027-07-03"])
+        treffer, diagnose, _ = tm.pruefen(
+            [1187, 1210, 1345], [(2027, 7)], dt.date(2026, 8, 3),
+            wochentage={5}, melde_trauorte={1210, 1345},
+        )
+        # Gemeldet wird nur Kurhaus und Casino ...
+        self.assertEqual(sorted(t.trauort for t in treffer), [1210, 1345])
+        # ... in der Zusammenfassung steht aber auch das Alte Rathaus.
+        self.assertEqual(sorted(diagnose["trauorte"]), ["1187", "1210", "1345"])
+        self.assertEqual(
+            diagnose["trauorte"]["1187"]["monate"]["2027-07"]["angelegt"], ["2027-07-03"]
+        )
+        self.assertFalse(diagnose["trauorte"]["1187"]["meldet"])
+        self.assertTrue(diagnose["trauorte"]["1210"]["meldet"])
+        self.assertEqual(diagnose["melde_trauorte"],
+                         ["Kurhaus", "Wiesbadener Casino-Gesellschaft"])
+
+    def test_ohne_meldeauswahl_melden_alle(self):
+        tm.http_get = self.attrappe(["2027-07-03"])
+        treffer, _, _ = tm.pruefen(
+            [1187, 1210], [(2027, 7)], dt.date(2026, 8, 3), wochentage={5},
+        )
+        self.assertEqual(sorted(t.trauort for t in treffer), [1187, 1210])
+
+    def test_nur_beobachtete_trauorte_kosten_keine_uhrzeitabfrage(self):
+        """Fuer nicht meldende Trauorte werden keine Uhrzeiten geladen."""
+        tm.http_get = self.attrappe(["2027-07-03"])
+        tm.pruefen([1187, 1210], [(2027, 7)], dt.date(2026, 8, 3),
+                   wochentage={5}, melde_trauorte={1210})
+        zeitabfragen = [u for u in self.aufrufe if "buerger_liste_termine_ajax" in u]
+        self.assertEqual(len(zeitabfragen), 1)
+        self.assertIn("trauort=1210", zeitabfragen[0])
+
     def test_leerer_monat_gibt_keine_treffer(self):
         tm.http_get = self.attrappe([])
         treffer, _, fehler = tm.pruefen([1187], [(2027, 8)], dt.date(2026, 8, 2))

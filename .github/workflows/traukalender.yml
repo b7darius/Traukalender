@@ -1,8 +1,10 @@
 name: Traukalender-Monitor
 
 # Prueft alle 15 Minuten rund um die Uhr, ob im Traukalender Wiesbaden Termine
-# an den Samstagen im Juli 2027 freigeschaltet werden - im Kurhaus und bei der
-# Wiesbadener Casino-Gesellschaft. Reiner Monitor, es wird nichts gebucht.
+# an den Samstagen im Juli 2027 freigeschaltet werden. Geprueft werden alle
+# Trauorte - sie stehen in der Zusammenfassung jedes Laufs -, benachrichtigt
+# wird nur fuer Kurhaus und Wiesbadener Casino-Gesellschaft.
+# Reiner Monitor, es wird nichts gebucht.
 # Das Repository ist oeffentlich, damit sind die Actions-Minuten unbegrenzt.
 #
 # Achtung: geplante Workflows laufen bei GitHub nur vom Standard-Branch aus.
@@ -42,7 +44,8 @@ jobs:
         id: check
         env:
           TK_MONATE: ${{ inputs.monate || vars.TK_MONATE || '2027-07' }}
-          TK_TRAUORTE: ${{ vars.TK_TRAUORTE || '1210,1345' }}
+          TK_TRAUORTE: ${{ vars.TK_TRAUORTE || 'alle' }}
+          TK_MELDE_TRAUORTE: ${{ vars.TK_MELDE_TRAUORTE || '1210,1345' }}
           TK_WOCHENTAGE: ${{ vars.TK_WOCHENTAGE || 'samstag' }}
           TK_NTFY_SERVER: ${{ vars.TK_NTFY_SERVER }}
           TK_NTFY_TOPIC: ${{ secrets.TK_NTFY_TOPIC }}
