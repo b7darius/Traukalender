@@ -23,8 +23,22 @@ class Wochentage(unittest.TestCase):
     def test_unbekannt_bricht_ab(self):
         with self.assertRaises(SystemExit):
             tb.wochentage_parsen("caturday")
-        with self.assertRaises(SystemExit):
-            tb.wochentage_parsen("")
+
+    def test_leer_bedeutet_alle_tage(self):
+        self.assertIsNone(tb.wochentage_parsen(""))
+        self.assertIsNone(tb.wochentage_parsen("alle"))
+
+    def test_buchung_verweigert_alle_tage(self):
+        """'alle' wuerde heissen, an einem beliebigen Tag verbindlich zu
+        reservieren - das muss die Buchung ablehnen."""
+        umgebung = {"TK_BUCHUNG_AKTIV": "1",
+                    "TK_PERSONENDATEN": json.dumps(DatenPruefung.VOLLSTAENDIG)}
+        with mock.patch.dict(os.environ, umgebung, clear=True), \
+             mock.patch.object(tb, "kandidaten") as kandidaten:
+            code = tb.main(["--wirklich-buchen", "--wochentage", "alle",
+                            "--state", "/nonexistent/gebucht.json"])
+        self.assertEqual(code, tb.EXIT_ERROR)
+        kandidaten.assert_not_called()
 
 
 class Personendaten(unittest.TestCase):

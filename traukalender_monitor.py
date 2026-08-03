@@ -2,8 +2,9 @@
 """Monitor fuer den Traukalender der Landeshauptstadt Wiesbaden.
 
 Prueft regelmaessig, ob im Traukalender (https://traukalender.wiesbaden.de)
-Termine in einem Zielmonat - standardmaessig August 2027 - freigeschaltet
-werden, und benachrichtigt sofort, sobald das passiert.
+Termine an bestimmten Tagen freigeschaltet werden, und benachrichtigt sofort,
+sobald das passiert. Voreingestellt sind die Samstage im Juli 2027 im Kurhaus
+und bei der Wiesbadener Casino-Gesellschaft.
 
 Der Kalender liefert seine Daten ueber einen oeffentlichen AJAX-Endpunkt,
 den auch die Webseite selbst benutzt:
@@ -198,6 +199,52 @@ def plus_monate(datum: dt.date, monate: int) -> dt.date:
     return dt.date(jahr, monat, tag)
 
 
+WOCHENTAGE = {
+    "montag": 0, "dienstag": 1, "mittwoch": 2, "donnerstag": 3,
+    "freitag": 4, "samstag": 5, "sonntag": 6,
+}
+
+
+def wochentage_parsen(wert: str) -> set[int] | None:
+    """Wochentage aus einer Angabe wie 'samstag' oder 'samstag,sonntag'.
+
+    'alle' oder eine leere Angabe bedeutet: keine Einschraenkung (None).
+    """
+    wert = (wert or "").strip().lower()
+    if not wert or wert == "alle":
+        return None
+    tage: set[int] = set()
+    for teil in wert.split(","):
+        teil = teil.strip()
+        if not teil:
+            continue
+        if teil.isdigit():
+            tage.add(int(teil) % 7)
+        elif teil in WOCHENTAGE:
+            tage.add(WOCHENTAGE[teil])
+        else:
+            raise SystemExit(f"Unbekannter Wochentag: {teil!r}")
+    if not tage:
+        raise SystemExit("Es wurde kein Wochentag angegeben.")
+    return tage
+
+
+def wochentage_namen(wochentage: set[int] | None) -> str:
+    if not wochentage:
+        return "alle Tage"
+    umgekehrt = {nummer: name for name, nummer in WOCHENTAGE.items()}
+    return ", ".join(umgekehrt[n].capitalize() for n in sorted(wochentage))
+
+
+def passt_auf_wochentag(iso: str, wochentage: set[int] | None) -> bool:
+    if not wochentage:
+        return True
+    try:
+        return dt.date.fromisoformat(iso).weekday() in wochentage
+    except ValueError:
+        return False
+
+
 def deutsches_datum(iso: str) -> str:
     try:
         datum = dt.date.fromisoformat(iso)
@@ -240,8 +287,12 @@ def pruefen(
     heute: dt.date,
     timeout: int = 30,
     mit_uhrzeiten: bool = True,
+    wochentage: set[int] | None = None,
 ) -> tuple[list[Treffer], dict[str, Any], list[str]]:
     """Fragt alle Trauorte fuer alle Zielmonate ab.
+
+    wochentage begrenzt auf bestimmte Wochentage (0 = Montag). None bedeutet
+    alle Tage.
 
     Rueckgabe: (Treffer, Diagnose, Fehler)
     """
@@ -257,6 +308,7 @@ def pruefen(
         "geprueft_am": dt.datetime.now().astimezone().isoformat(timespec="seconds"),
         "reservierbar_bis": max_portal,
         "zielmonate": [f"{j}-{m:02d}" for j, m in monate],
+        "wochentage": wochentage_namen(wochentage),
         "trauorte": {},
     }
 
@@ -276,8 +328,10 @@ def pruefen(
                 fehler.append(f"{name} {schluessel}: {err}")
                 continue
 
-            angelegt = sorted(backend.get("appointments") or [])
-            reservierbar = set(portal.get("appointments") or [])
+            angelegt = [t for t in sorted(backend.get("appointments") or [])
+                        if passt_auf_wochentag(t, wochentage)]
+            reservierbar = {t for t in (portal.get("appointments") or [])
+                            if passt_auf_wochentag(t, wochentage)}
             info["monate"][schluessel] = {
                 "angelegt": angelegt,
                 "reservierbar": sorted(reservierbar),
@@ -511,7 +565,8 @@ def zusammenfassung_drucken(
 ) -> None:
     stempel = diagnose.get("geprueft_am", "")
     monate = ", ".join(diagnose.get("zielmonate", []))
-    print(f"[{stempel}] Zielmonate: {monate} | reservierbar bis {diagnose.get('reservierbar_bis')}")
+    print(f"[{stempel}] Zielmonate: {monate} | {diagnose.get('wochentage', 'alle Tage')} "
+          f"| reservierbar bis {diagnose.get('reservierbar_bis')}")
     for trauort_id, info in diagnose.get("trauorte", {}).items():
         teile = []
         for monat, werte in info.get("monate", {}).items():
@@ -539,7 +594,7 @@ def statusbericht(diagnose: dict[str, Any], fehler: list[str]) -> tuple[str, str
     monate = ", ".join(diagnose.get("zielmonate", []))
     titel = f"Traukalender-Monitor laeuft - {monate} noch ohne Termine"
     zeilen = [
-        f"Beobachtet: {monate}",
+        f"Beobachtet: {monate}, {diagnose.get('wochentage', 'alle Tage')}",
         f"Geprueft am: {diagnose.get('geprueft_am', '?')}",
         f"Reservierbar aktuell bis: {diagnose.get('reservierbar_bis', '?')}",
         "",
@@ -585,11 +640,12 @@ def durchlauf(args: argparse.Namespace, cfg: dict[str, str]) -> int:
     heute = dt.date.today() if not args.heute else dt.date.fromisoformat(args.heute)
     monate = monate_parsen(args.monate.split(","))
     trauorte = trauorte_parsen(args.trauorte)
+    wochentage = wochentage_parsen(args.wochentage)
 
     try:
         treffer, diagnose, fehler = pruefen(
             trauorte, monate, heute, timeout=args.timeout,
-            mit_uhrzeiten=not args.ohne_uhrzeiten,
+            mit_uhrzeiten=not args.ohne_uhrzeiten, wochentage=wochentage,
         )
     except Exception as err:
         print(f"[fehler] Pruefung abgebrochen: {err}", file=sys.stderr)
@@ -673,10 +729,14 @@ def main(argv: list[str] | None = None) -> int:
             "  python traukalender_monitor.py --monate 2027-08,2027-09 --horizont\n"
         ),
     )
-    parser.add_argument("--monate", default=os.environ.get("TK_MONATE", "2027-08"),
-                        help="Zielmonate als JJJJ-MM, kommagetrennt (Standard: 2027-08)")
-    parser.add_argument("--trauorte", default=os.environ.get("TK_TRAUORTE", "alle"),
-                        help="Trauort-IDs kommagetrennt oder 'alle' (Standard: alle)")
+    parser.add_argument("--monate", default=os.environ.get("TK_MONATE", "2027-07"),
+                        help="Zielmonate als JJJJ-MM, kommagetrennt (Standard: 2027-07)")
+    parser.add_argument("--trauorte", default=os.environ.get("TK_TRAUORTE", "1210,1345"),
+                        help="Trauort-IDs kommagetrennt oder 'alle' "
+                             "(Standard: 1210,1345 = Kurhaus und Casino-Gesellschaft)")
+    parser.add_argument("--wochentage", default=os.environ.get("TK_WOCHENTAGE", "samstag"),
+                        help="nur diese Wochentage melden, z.B. 'samstag' oder "
+                             "'alle' (Standard: samstag)")
     parser.add_argument("--state", default=os.environ.get("TK_STATE", "state/state.json"),
                         help="Datei fuer den Zustand (verhindert doppelte Meldungen)")
     parser.add_argument("--watch", action="store_true",

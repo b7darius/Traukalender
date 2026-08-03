@@ -67,6 +67,28 @@ class ZustandUndDedupe(unittest.TestCase):
             self.assertEqual(tm.zustand_laden(pfad), {"gemeldet": {}})
 
 
+class Wochentagsfilter(unittest.TestCase):
+    def test_parsen(self):
+        self.assertEqual(tm.wochentage_parsen("samstag"), {5})
+        self.assertEqual(tm.wochentage_parsen("Samstag, Sonntag"), {5, 6})
+        self.assertIsNone(tm.wochentage_parsen("alle"))
+        self.assertIsNone(tm.wochentage_parsen(""))
+        with self.assertRaises(SystemExit):
+            tm.wochentage_parsen("caturday")
+
+    def test_namen_fuer_die_ausgabe(self):
+        self.assertEqual(tm.wochentage_namen({5}), "Samstag")
+        self.assertEqual(tm.wochentage_namen({5, 6}), "Samstag, Sonntag")
+        self.assertEqual(tm.wochentage_namen(None), "alle Tage")
+
+    def test_passt_auf_wochentag(self):
+        # 2027-07-03 ist ein Samstag, 2027-07-01 ein Donnerstag.
+        self.assertTrue(tm.passt_auf_wochentag("2027-07-03", {5}))
+        self.assertFalse(tm.passt_auf_wochentag("2027-07-01", {5}))
+        self.assertTrue(tm.passt_auf_wochentag("2027-07-01", None))
+        self.assertFalse(tm.passt_auf_wochentag("kein-datum", {5}))
+
+
 class BenachrichtigungOhneLink(unittest.TestCase):
     """Ein Tippen auf die Meldung soll nicht den Traukalender oeffnen."""
 
@@ -204,6 +226,26 @@ class ApiMitAttrappe(unittest.TestCase):
         tm.http_get = self.attrappe(["2027-08-14"])
         treffer, _, _ = tm.pruefen([1187], [(2027, 8)], dt.date(2026, 8, 20))
         self.assertTrue(treffer[0].buchbar)
+
+    def test_wochentagsfilter_greift(self):
+        # 01.07. Donnerstag, 03.07. Samstag, 10.07. Samstag
+        tm.http_get = self.attrappe(["2027-07-01", "2027-07-03", "2027-07-10"])
+        treffer, diagnose, _ = tm.pruefen(
+            [1210], [(2027, 7)], dt.date(2026, 8, 3), wochentage={5}
+        )
+        self.assertEqual([t.datum for t in treffer], ["2027-07-03", "2027-07-10"])
+        self.assertEqual(diagnose["wochentage"], "Samstag")
+        # Auch die Diagnose zaehlt nur die gefilterten Tage.
+        monat = diagnose["trauorte"]["1210"]["monate"]["2027-07"]
+        self.assertEqual(monat["angelegt"], ["2027-07-03", "2027-07-10"])
+
+    def test_ohne_filter_alle_tage(self):
+        tm.http_get = self.attrappe(["2027-07-01", "2027-07-03"])
+        treffer, diagnose, _ = tm.pruefen(
+            [1210], [(2027, 7)], dt.date(2026, 8, 3), wochentage=None
+        )
+        self.assertEqual(len(treffer), 2)
+        self.assertEqual(diagnose["wochentage"], "alle Tage")
 
     def test_leerer_monat_gibt_keine_treffer(self):
         tm.http_get = self.attrappe([])

@@ -1,21 +1,25 @@
 # Traukalender-Monitor Wiesbaden
 
 Überwacht den [Traukalender der Landeshauptstadt Wiesbaden](https://traukalender.wiesbaden.de/de/Start-159.html)
-und meldet sich sofort, sobald Termine im Zielmonat – standardmäßig **August 2027** –
-freigeschaltet werden.
+und meldet sich per Push aufs Handy, sobald passende Termine freigeschaltet werden.
+
+Beobachtet werden die **Samstage im Juli 2027** im **Kurhaus** und bei der
+**Wiesbadener Casino-Gesellschaft**. Reiner Monitor – es wird nichts gebucht.
 
 Reines Python 3 aus der Standardbibliothek, keine Abhängigkeiten, kein Browser.
 
-## Warum August 2027 heute noch nicht wählbar ist
+## Zwei Grenzen des Kalenders
 
 Der Kalender ist zwar offen, aber zwei Dinge begrenzen ihn:
 
 1. **12-Monats-Regel.** Das Portal setzt das Ende des wählbaren Zeitraums auf
    *heute + 12 Monate* („Termine können maximal 12 Monate im Voraus reserviert
-   werden"). Am 02.08.2026 endete der Zeitraum entsprechend am 02.08.2027.
-2. **Termine sind noch nicht angelegt.** Auch wenn man die Grenze umgeht, liefert
-   der Kalender für August 2027 an **keinem** der sechs Trauorte Termine. Der
-   späteste derzeit hinterlegte Tag ist der 31.07.2027 (Altes Rathaus).
+   werden"). Juli 2027 liegt seit Juli 2026 vollständig in diesem Fenster – an
+   dieser Grenze scheitert es also nicht mehr.
+2. **Termine sind noch nicht angelegt.** Die beiden beobachteten Trauorte sind
+   noch weit von Juli 2027 entfernt: das Kurhaus reicht bis 06.03.2027, die
+   Casino-Gesellschaft bis 09.04.2027 (Stand 02.08.2026). Bis dort Juli-Termine
+   erscheinen, bleibt es still – genau darauf wartet der Monitor.
 
 Der Monitor prüft deshalb beides getrennt und meldet **beide** Ereignisse:
 
@@ -28,30 +32,32 @@ So kommt die Nachricht schon in dem Moment, in dem die Termine im System
 auftauchen – nicht erst, wenn sie auch anklickbar sind.
 
 Wie weit die Trauorte gefüllt sind, unterscheidet sich deutlich (Stand 02.08.2026,
-ermittelt mit `--horizont`):
+ermittelt mit `--horizont`) – die beiden beobachteten sind **fett**:
 
 | Trauort                           | letzter hinterlegter Tag |
 |-----------------------------------|--------------------------|
 | Altes Rathaus                     | 31.07.2027               |
 | thalhaus Theater Wiesbaden        | 24.07.2027               |
 | Nerobergbahn                      | 16.07.2027               |
-| Wiesbadener Casino-Gesellschaft   | 09.04.2027               |
-| Kurhaus                           | 06.03.2027               |
+| **Wiesbadener Casino-Gesellschaft** | **09.04.2027**         |
+| **Kurhaus**                       | **06.03.2027**           |
 | Kleiner Festsaal im Neuen Rathaus | 16.01.2027               |
 
-Der Monitor beobachtet standardmäßig alle sechs Trauorte gleichzeitig.
+Beobachtet werden nur Kurhaus und Casino-Gesellschaft, und dort nur die
+Samstage. Mit `--trauorte alle --wochentage alle` lässt sich das jederzeit
+aufweiten.
 
 ## Schnellstart
 
 ```bash
-# einmalig prüfen
+# einmalig prüfen (Samstage im Juli 2027, Kurhaus und Casino)
 python3 traukalender_monitor.py
 
 # dauerhaft laufen lassen, alle 15 Minuten
 python3 traukalender_monitor.py --watch
 
-# anderer Zielmonat / nur bestimmte Trauorte
-python3 traukalender_monitor.py --monate 2027-08,2027-09 --trauorte 1187,1210
+# abweichend: anderer Monat, andere Trauorte, alle Wochentage
+python3 traukalender_monitor.py --monate 2027-08 --trauorte alle --wochentage alle
 
 # wie weit ist der Kalender aktuell geöffnet?
 python3 traukalender_monitor.py --horizont
@@ -106,16 +112,16 @@ export TK_TELEGRAM_CHAT=987654321        # eigene Chat-ID
 ### Beliebiger Webhook
 
 ```bash
-export TK_WEBHOOK_URL=https://...   # bekommt JSON: {title, text, url}
+export TK_WEBHOOK_URL=https://...   # bekommt JSON: {title, text}
 ```
 
 ## Dauerbetrieb per GitHub Actions
 
-`.github/workflows/traukalender.yml` prüft halbstündlich zwischen 07:00 und
-23:00 deutscher Zeit, schreibt den Zustand ins Repository zurück und legt bei
-einem Treffer zusätzlich ein Issue an.
-Der Workflow läuft ohne jede weitere Konfiguration – die Issue-Mail von GitHub
-ist der Meldeweg, der immer funktioniert. Push aufs Handy kommt über ntfy dazu.
+`.github/workflows/traukalender.yml` prüft alle 15 Minuten (GitHub drosselt das
+in der Praxis auf etwa ein- bis zweistündlich), schreibt den Zustand ins
+Repository zurück und legt bei einem Treffer zusätzlich ein Issue an.
+Push aufs Handy kommt über ntfy, das Issue ist der zusätzliche schriftliche
+Nachweis. **Gebucht wird nichts** – der Workflow ist ein reiner Monitor.
 
 **Einrichtung**
 
@@ -132,8 +138,10 @@ ist der Meldeweg, der immer funktioniert. Push aufs Handy kommt über ntfy dazu.
    Weitere optionale Secrets: `TK_NTFY_TOKEN`, `TK_SMTP_HOST`, `TK_SMTP_PORT`,
    `TK_SMTP_USER`, `TK_SMTP_PASS`, `TK_MAIL_FROM`, `TK_MAIL_TO`,
    `TK_TELEGRAM_TOKEN`, `TK_TELEGRAM_CHAT`, `TK_WEBHOOK_URL`.
-   Der Zielmonat lässt sich als *Variable* `TK_MONATE` überschreiben
-   (Standard `2027-08`).
+   Was beobachtet wird, lässt sich über *Variables* überschreiben:
+   `TK_MONATE` (Standard `2027-07`), `TK_TRAUORTE` (Standard `1210,1345` =
+   Kurhaus und Casino-Gesellschaft) und `TK_WOCHENTAGE` (Standard `samstag`,
+   `alle` für jeden Tag).
 4. *Settings → Notifications* prüfen, damit die Issue-Mails auch ankommen.
 
 **Wenn die Issue-Mail nicht ankommt**
@@ -258,9 +266,13 @@ Die Tests laufen offline gegen eine Attrappe des Endpunkts.
 
 ## Automatisch reservieren
 
-`traukalender_buchung.py` kann den Termin auch selbst reservieren, sobald einer
-frei wird. Voreingestellt: **Samstage im August 2027**, ausschließlich **Kurhaus**
-oder **Wiesbadener Casino-Gesellschaft**.
+> **Nicht aktiv.** Die automatische Reservierung ist bewusst **nicht** in den
+> Workflow eingebunden – der Dauerbetrieb ist ein reiner Monitor. Das Modul
+> bleibt als Werkzeug für den Handbetrieb erhalten; von allein läuft es nie.
+
+`traukalender_buchung.py` kann einen Termin auch selbst reservieren. Voreingestellt:
+**Samstage im August 2027**, ausschließlich **Kurhaus** oder **Wiesbadener
+Casino-Gesellschaft**.
 
 Ausgewählt wird der **frühestmögliche Samstag** und darin die **späteste
 Uhrzeit**. Jeder Samstag ist recht, deshalb wird zugegriffen, sobald überhaupt
@@ -342,13 +354,11 @@ Anschrift, Land, Staatsangehörigkeit sowie E-Mail und Telefonnummer.
 **Geburtsdaten werden nicht abgefragt** – die braucht erst die eigentliche
 Anmeldung der Eheschließung beim Standesamt.
 
-Zum Scharfschalten in GitHub Actions genügt **ein Schritt**: das Secret
-`TK_PERSONENDATEN` mit dem JSON oben anlegen. Ab dem nächsten geplanten Lauf
-wird reserviert, sobald ein passender Termin frei ist.
-
-Optional abweichend einstellen (als *Variables*): `TK_BUCHUNG_MONATE`
-(`2027-08`), `TK_BUCHUNG_TRAUORTE` (`1210,1345`), `TK_BUCHUNG_WOCHENTAGE`
-(`samstag`). Zum Abschalten `TK_BUCHUNG_AKTIV` auf `0` setzen.
+Der Workflow ruft dieses Modul **nicht** auf. Wer es wieder scharf schalten
+will, muss den entsprechenden Schritt in `.github/workflows/traukalender.yml`
+zurückholen und das Secret `TK_PERSONENDATEN` hinterlegen. Solange das nicht
+geschieht, wird über GitHub Actions nichts reserviert – auch dann nicht, wenn
+das Secret noch aus einer früheren Einrichtung vorhanden ist.
 
 Der Buchungsschritt läuft nur bei **geplanten** Läufen, nicht bei manuell
 gestarteten – ein Testlauf von Hand kann also nichts auslösen.

@@ -49,17 +49,13 @@ from traukalender_monitor import (
     monat_abfragen,
     monate_parsen,
     plus_monate,
+    wochentage_parsen,
 )
 
 USER_AGENT = (
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 )
-
-WOCHENTAGE = {
-    "montag": 0, "dienstag": 1, "mittwoch": 2, "donnerstag": 3,
-    "freitag": 4, "samstag": 5, "sonntag": 6,
-}
 
 EXIT_OK = 0
 EXIT_ERROR = 1
@@ -561,23 +557,6 @@ def buchungszustand_speichern(pfad: str, zustand: dict[str, Any]) -> None:
 # --------------------------------------------------------------------------
 
 
-def wochentage_parsen(wert: str) -> set[int]:
-    tage: set[int] = set()
-    for teil in (wert or "").split(","):
-        teil = teil.strip().lower()
-        if not teil:
-            continue
-        if teil.isdigit():
-            tage.add(int(teil) % 7)
-        elif teil in WOCHENTAGE:
-            tage.add(WOCHENTAGE[teil])
-        else:
-            raise SystemExit(f"Unbekannter Wochentag: {teil!r}")
-    if not tage:
-        raise SystemExit("Es wurde kein Wochentag angegeben.")
-    return tage
-
-
 def daten_pruefen() -> int:
     """Prueft die hinterlegten Personendaten auf Vollstaendigkeit.
 
@@ -660,7 +639,14 @@ def main(argv: list[str] | None = None) -> int:
     heute = dt.date.fromisoformat(args.heute) if args.heute else dt.date.today()
     monate = monate_parsen(args.monate.split(","))
     trauorte = [int(t) for t in args.trauorte.split(",") if t.strip()]
+    # Fuer die Buchung muss der Wochentag ausdruecklich benannt sein. "alle"
+    # wuerde hier bedeuten, an einem beliebigen Tag verbindlich zu reservieren
+    # - das soll niemand aus Versehen bekommen.
     tage = wochentage_parsen(args.wochentage)
+    if tage is None:
+        print("[fehler] Fuer die Buchung muss ein Wochentag angegeben werden, "
+              "'alle' ist hier nicht zulaessig.", file=sys.stderr)
+        return EXIT_ERROR
     cfg = config_aus_umgebung()
 
     sitzung = Sitzung(timeout=args.timeout)
