@@ -393,9 +393,6 @@ def nachricht_bauen(treffer: list[Treffer], diagnose: dict[str, Any]) -> tuple[s
             "",
             f"Reservierbar aktuell bis: {diagnose.get('reservierbar_bis', '?')}",
             "",
-            "Jetzt reservieren:",
-            START_URL,
-            "",
             "Hinweis: Termine sind maximal 12 Monate im Voraus reservierbar.",
             "Sind Tage 'angelegt, aber noch ausserhalb der Frist', werden sie",
             "an dem Tag freigeschaltet, an dem sie genau 12 Monate entfernt sind.",
@@ -417,11 +414,12 @@ def benachrichtigen(titel: str, text: str, cfg: dict[str, str]) -> list[str]:
             req = urllib.request.Request(
                 f"{server.rstrip('/')}/{topic}",
                 data=text.encode("utf-8"),
+                # Bewusst ohne "Click"-Kopfzeile: ein Tippen auf die Meldung
+                # soll nicht ungefragt den Traukalender oeffnen.
                 headers={
                     "Title": titel.encode("ascii", "replace").decode(),
                     "Priority": "urgent",
                     "Tags": "wedding,bell",
-                    "Click": START_URL,
                 },
             )
             if cfg.get("ntfy_token"):
@@ -471,7 +469,7 @@ def benachrichtigen(titel: str, text: str, cfg: dict[str, str]) -> list[str]:
     if cfg.get("webhook_url"):
         try:
             nutzlast = json.dumps(
-                {"title": titel, "text": text, "url": START_URL}, ensure_ascii=False
+                {"title": titel, "text": text}, ensure_ascii=False
             ).encode("utf-8")
             req = urllib.request.Request(
                 cfg["webhook_url"], data=nutzlast,
@@ -624,12 +622,12 @@ def durchlauf(args: argparse.Namespace, cfg: dict[str, str]) -> int:
         if not args.force:
             als_gemeldet_merken(zustand, zu_melden)
     else:
+        # Ohne Fund wird nur der Bericht geschrieben, der in der Zusammenfassung
+        # des Laufs landet. Benachrichtigt wird ausschliesslich bei einem
+        # echten Fund - Meldungen ohne Anlass wuerden nur abstumpfen.
         titel, text = statusbericht(diagnose, fehler)
         if args.bericht:
             bericht_schreiben(args.bericht, titel, text)
-        if args.heartbeat:
-            kanaele = benachrichtigen(titel, text, cfg)
-            print(f"[info] Lebenszeichen verschickt ueber: {', '.join(kanaele) or 'keinen Kanal'}")
         github_output_setzen(False, "")
 
     # Bewusst nur tagesgenau: die Zustandsdatei wird im GitHub-Workflow ins
@@ -696,9 +694,6 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--bericht", default=os.environ.get("TK_BERICHT", ""),
                         help="Markdown-Bericht in diese Datei schreiben (bei Fund die Meldung, "
                              "sonst den aktuellen Stand)")
-    parser.add_argument("--heartbeat", action="store_true",
-                        help="auch ohne Fund ein Lebenszeichen ueber die Benachrichtigungskanaele "
-                             "schicken - zeigt, dass die Ueberwachung noch laeuft")
     parser.add_argument("--test-notify", action="store_true",
                         help="Testnachricht ueber alle konfigurierten Kanaele senden")
     parser.add_argument("--heute", default="", help="Datum ueberschreiben (JJJJ-MM-TT), fuer Tests")

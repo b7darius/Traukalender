@@ -67,6 +67,40 @@ class ZustandUndDedupe(unittest.TestCase):
             self.assertEqual(tm.zustand_laden(pfad), {"gemeldet": {}})
 
 
+class BenachrichtigungOhneLink(unittest.TestCase):
+    """Ein Tippen auf die Meldung soll nicht den Traukalender oeffnen."""
+
+    def test_meldungstext_enthaelt_keine_adresse(self):
+        diagnose = {"zielmonate": ["2027-08"], "reservierbar_bis": "2027-08-02"}
+        _, text = tm.nachricht_bauen(
+            [tm.Treffer(1187, "2027-08-14", True, ["10:00 - 10:30"])], diagnose
+        )
+        self.assertNotIn("http", text)
+
+    def test_ntfy_sendet_keine_click_kopfzeile(self):
+        import io
+        import urllib.request
+
+        gesendet = []
+
+        def fake_urlopen(req, timeout=30):
+            gesendet.append(req)
+            return io.BytesIO(b"")
+
+        original = urllib.request.urlopen
+        urllib.request.urlopen = fake_urlopen
+        try:
+            kanaele = tm.benachrichtigen("Titel", "Text", {"ntfy_topic": "abc"})
+        finally:
+            urllib.request.urlopen = original
+
+        self.assertEqual(kanaele, ["ntfy"])
+        self.assertEqual(len(gesendet), 1)
+        kopfzeilen = {k.lower() for k in gesendet[0].headers}
+        self.assertNotIn("click", kopfzeilen)
+        self.assertIn("title", kopfzeilen)
+
+
 class Marker(unittest.TestCase):
     def test_stabil_und_reihenfolgeunabhaengig(self):
         a = tm.Treffer(1187, "2027-08-14", True, [])

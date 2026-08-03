@@ -160,11 +160,17 @@ geht direkt aufs Handy und hängt an keiner Kontoeinstellung.
   eine **Zusammenfassung**, auch wenn nichts gefunden wurde: welcher Monat
   beobachtet wird, bis wann aktuell reserviert werden kann und der Stand je
   Trauort.
-* **Montags um 11:05 deutscher Zeit** kommt ein Lebenszeichen aufs Handy
-  („Monitor läuft – 2027-08 noch ohne Termine"). Bleibt es zweimal aus, stimmt
-  etwas nicht.
 * `state/state.json` im Repository enthält den letzten Stand samt Datum der
   letzten Prüfung.
+
+Aufs Handy kommt **nur etwas, wenn wirklich ein Termin gefunden oder reserviert
+wurde** – keine Statusmeldungen, keine Lebenszeichen. Meldungen ohne Anlass
+stumpfen ab, und genau die eine Nachricht, auf die es ankommt, ginge zwischen
+ihnen unter. Ob die Überwachung läuft, steht in der Liste der Actions-Läufe.
+
+Die Push-Nachricht enthält **keinen Link**: ein Tippen darauf soll nicht
+ungefragt den Traukalender öffnen. Die Adresse zum Reservieren steht im Issue,
+das bei einem Fund entsteht.
 
 **Was beim Dauerbetrieb sonst noch zählt**
 
