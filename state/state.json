@@ -1,8 +1,33 @@
 {
   "diagnose": {
+    "melde_trauorte": [
+      "Kurhaus",
+      "Wiesbadener Casino-Gesellschaft"
+    ],
     "reservierbar_bis": "2027-08-04",
     "trauorte": {
+      "1187": {
+        "meldet": false,
+        "monate": {
+          "2027-07": {
+            "angelegt": [
+              "2027-07-03",
+              "2027-07-10",
+              "2027-07-17",
+              "2027-07-31"
+            ],
+            "reservierbar": [
+              "2027-07-03",
+              "2027-07-10",
+              "2027-07-17",
+              "2027-07-31"
+            ]
+          }
+        },
+        "name": "Altes Rathaus"
+      },
       "1210": {
+        "meldet": true,
         "monate": {
           "2027-07": {
             "angelegt": [],
@@ -11,7 +36,18 @@
         },
         "name": "Kurhaus"
       },
+      "1237": {
+        "meldet": false,
+        "monate": {
+          "2027-07": {
+            "angelegt": [],
+            "reservierbar": []
+          }
+        },
+        "name": "Nerobergbahn"
+      },
       "1345": {
+        "meldet": true,
         "monate": {
           "2027-07": {
             "angelegt": [],
@@ -19,6 +55,30 @@
           }
         },
         "name": "Wiesbadener Casino-Gesellschaft"
+      },
+      "139598": {
+        "meldet": false,
+        "monate": {
+          "2027-07": {
+            "angelegt": [],
+            "reservierbar": []
+          }
+        },
+        "name": "Kleiner Festsaal im Neuen Rathaus"
+      },
+      "32243": {
+        "meldet": false,
+        "monate": {
+          "2027-07": {
+            "angelegt": [
+              "2027-07-24"
+            ],
+            "reservierbar": [
+              "2027-07-24"
+            ]
+          }
+        },
+        "name": "thalhaus Theater Wiesbaden"
       }
     },
     "wochentage": "Samstag",
