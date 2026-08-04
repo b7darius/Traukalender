@@ -3,8 +3,9 @@
 
 Prueft regelmaessig, ob im Traukalender (https://traukalender.wiesbaden.de)
 Termine an bestimmten Tagen freigeschaltet werden, und benachrichtigt sofort,
-sobald das passiert. Voreingestellt sind die Samstage im Juli 2027 im Kurhaus
-und bei der Wiesbadener Casino-Gesellschaft.
+sobald das passiert. Voreingestellt sind die Samstage im Juli 2027: geprueft
+werden alle Trauorte, benachrichtigt wird nur fuer das Kurhaus und die
+Wiesbadener Casino-Gesellschaft.
 
 Der Kalender liefert seine Daten ueber einen oeffentlichen AJAX-Endpunkt,
 den auch die Webseite selbst benutzt:
@@ -288,11 +289,16 @@ def pruefen(
     timeout: int = 30,
     mit_uhrzeiten: bool = True,
     wochentage: set[int] | None = None,
+    melde_trauorte: set[int] | None = None,
 ) -> tuple[list[Treffer], dict[str, Any], list[str]]:
     """Fragt alle Trauorte fuer alle Zielmonate ab.
 
     wochentage begrenzt auf bestimmte Wochentage (0 = Montag). None bedeutet
     alle Tage.
+
+    melde_trauorte trennt Beobachten von Melden: geprueft und in der
+    Zusammenfassung ausgewiesen werden alle uebergebenen Trauorte, ein Treffer
+    entsteht aber nur fuer diese Auswahl. None heisst: alle melden.
 
     Rueckgabe: (Treffer, Diagnose, Fehler)
     """
@@ -309,12 +315,16 @@ def pruefen(
         "reservierbar_bis": max_portal,
         "zielmonate": [f"{j}-{m:02d}" for j, m in monate],
         "wochentage": wochentage_namen(wochentage),
+        "melde_trauorte": sorted(
+            TRAUORTE.get(t, str(t)) for t in (melde_trauorte or trauorte)
+        ),
         "trauorte": {},
     }
 
     for trauort in trauorte:
         name = TRAUORTE.get(trauort, f"Trauort {trauort}")
-        info: dict[str, Any] = {"name": name, "monate": {}}
+        meldet = melde_trauorte is None or trauort in melde_trauorte
+        info: dict[str, Any] = {"name": name, "meldet": meldet, "monate": {}}
         for jahr, monat in monate:
             schluessel = f"{jahr}-{monat:02d}"
             try:
@@ -336,6 +346,10 @@ def pruefen(
                 "angelegt": angelegt,
                 "reservierbar": sorted(reservierbar),
             }
+            if not meldet:
+                # Nur beobachtet: taucht in der Zusammenfassung auf, loest aber
+                # keine Meldung aus. Die Uhrzeiten spart das gleich mit ein.
+                continue
             for datum in angelegt:
                 zeiten = uhrzeiten_abfragen(trauort, datum, timeout) if mit_uhrzeiten else []
                 treffer.append(Treffer(trauort, datum, datum in reservierbar, zeiten))
@@ -567,6 +581,7 @@ def zusammenfassung_drucken(
     monate = ", ".join(diagnose.get("zielmonate", []))
     print(f"[{stempel}] Zielmonate: {monate} | {diagnose.get('wochentage', 'alle Tage')} "
           f"| reservierbar bis {diagnose.get('reservierbar_bis')}")
+    print(f"  Benachrichtigung nur fuer: {', '.join(diagnose.get('melde_trauorte', []))}")
     for trauort_id, info in diagnose.get("trauorte", {}).items():
         teile = []
         for monat, werte in info.get("monate", {}).items():
@@ -574,13 +589,15 @@ def zusammenfassung_drucken(
                 f"{monat}: {len(werte['angelegt'])} Tag(e) angelegt, "
                 f"{len(werte['reservierbar'])} reservierbar"
             )
-        print(f"  {info.get('name', trauort_id):34s} " + " | ".join(teile))
+        # ">" markiert die Trauorte, die eine Meldung ausloesen koennen.
+        marke = ">" if info.get("meldet", True) else " "
+        print(f"  {marke} {info.get('name', trauort_id):34s} " + " | ".join(teile))
     for meldung in fehler:
         print(f"  [fehler] {meldung}", file=sys.stderr)
     if treffer:
-        print(f"  -> {len(treffer)} Tag(e) mit Terminen gefunden.")
+        print(f"  -> {len(treffer)} meldepflichtige(r) Tag(e) gefunden.")
     else:
-        print("  -> noch keine Termine in den Zielmonaten.")
+        print("  -> nichts zu melden (an den meldenden Trauorten keine Termine).")
 
 
 def bericht_schreiben(pfad: str, titel: str, text: str) -> None:
@@ -595,17 +612,19 @@ def statusbericht(diagnose: dict[str, Any], fehler: list[str]) -> tuple[str, str
     titel = f"Traukalender-Monitor laeuft - {monate} noch ohne Termine"
     zeilen = [
         f"Beobachtet: {monate}, {diagnose.get('wochentage', 'alle Tage')}",
+        f"Meldung nur fuer: {', '.join(diagnose.get('melde_trauorte', []))}",
         f"Geprueft am: {diagnose.get('geprueft_am', '?')}",
         f"Reservierbar aktuell bis: {diagnose.get('reservierbar_bis', '?')}",
         "",
-        "Stand je Trauort:",
+        "Stand je Trauort (* = meldet):",
     ]
     for trauort_id, info in diagnose.get("trauorte", {}).items():
         teile = [
             f"{monat}: {len(werte['angelegt'])} Tag(e)"
             for monat, werte in info.get("monate", {}).items()
         ]
-        zeilen.append(f"* {info.get('name', trauort_id)} - {', '.join(teile)}")
+        marke = "*" if info.get("meldet", True) else "-"
+        zeilen.append(f"{marke} {info.get('name', trauort_id)} - {', '.join(teile)}")
     if fehler:
         zeilen += ["", "Fehler bei einzelnen Abfragen:"] + [f"* {f}" for f in fehler]
     return titel, "\n".join(zeilen)
@@ -640,12 +659,14 @@ def durchlauf(args: argparse.Namespace, cfg: dict[str, str]) -> int:
     heute = dt.date.today() if not args.heute else dt.date.fromisoformat(args.heute)
     monate = monate_parsen(args.monate.split(","))
     trauorte = trauorte_parsen(args.trauorte)
+    melde_trauorte = set(trauorte_parsen(args.melde_trauorte))
     wochentage = wochentage_parsen(args.wochentage)
 
     try:
         treffer, diagnose, fehler = pruefen(
             trauorte, monate, heute, timeout=args.timeout,
             mit_uhrzeiten=not args.ohne_uhrzeiten, wochentage=wochentage,
+            melde_trauorte=melde_trauorte,
         )
     except Exception as err:
         print(f"[fehler] Pruefung abgebrochen: {err}", file=sys.stderr)
@@ -731,9 +752,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--monate", default=os.environ.get("TK_MONATE", "2027-07"),
                         help="Zielmonate als JJJJ-MM, kommagetrennt (Standard: 2027-07)")
-    parser.add_argument("--trauorte", default=os.environ.get("TK_TRAUORTE", "1210,1345"),
-                        help="Trauort-IDs kommagetrennt oder 'alle' "
-                             "(Standard: 1210,1345 = Kurhaus und Casino-Gesellschaft)")
+    parser.add_argument("--trauorte", default=os.environ.get("TK_TRAUORTE", "alle"),
+                        help="welche Trauorte geprueft werden: IDs kommagetrennt "
+                             "oder 'alle' (Standard: alle)")
+    parser.add_argument("--melde-trauorte", dest="melde_trauorte",
+                        default=os.environ.get("TK_MELDE_TRAUORTE", "1210,1345"),
+                        help="welche Trauorte eine Benachrichtigung ausloesen: IDs "
+                             "kommagetrennt oder 'alle' (Standard: 1210,1345 = "
+                             "Kurhaus und Casino-Gesellschaft)")
     parser.add_argument("--wochentage", default=os.environ.get("TK_WOCHENTAGE", "samstag"),
                         help="nur diese Wochentage melden, z.B. 'samstag' oder "
                              "'alle' (Standard: samstag)")

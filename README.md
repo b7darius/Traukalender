@@ -3,8 +3,11 @@
 Überwacht den [Traukalender der Landeshauptstadt Wiesbaden](https://traukalender.wiesbaden.de/de/Start-159.html)
 und meldet sich per Push aufs Handy, sobald passende Termine freigeschaltet werden.
 
-Beobachtet werden die **Samstage im Juli 2027** im **Kurhaus** und bei der
-**Wiesbadener Casino-Gesellschaft**. Reiner Monitor – es wird nichts gebucht.
+Beobachtet werden die **Samstage im Juli 2027**. Geprüft werden **alle sechs
+Trauorte** – sie stehen in der Zusammenfassung jedes Laufs –, eine
+**Benachrichtigung** kommt aber nur, wenn im **Kurhaus** oder bei der
+**Wiesbadener Casino-Gesellschaft** ein Termin frei wird.
+Reiner Monitor – es wird nichts gebucht.
 
 Reines Python 3 aus der Standardbibliothek, keine Abhängigkeiten, kein Browser.
 
@@ -43,21 +46,25 @@ ermittelt mit `--horizont`) – die beiden beobachteten sind **fett**:
 | **Kurhaus**                       | **06.03.2027**           |
 | Kleiner Festsaal im Neuen Rathaus | 16.01.2027               |
 
-Beobachtet werden nur Kurhaus und Casino-Gesellschaft, und dort nur die
-Samstage. Mit `--trauorte alle --wochentage alle` lässt sich das jederzeit
-aufweiten.
+Geprüft werden alle sechs, gemeldet wird nur für die beiden fetten. So sieht
+man in der Zusammenfassung, wie sich der Kalender insgesamt füllt, ohne für
+jeden Trauort eine Push-Nachricht zu bekommen. In der Ausgabe markiert ein
+`>` die meldenden Trauorte.
 
 ## Schnellstart
 
 ```bash
-# einmalig prüfen (Samstage im Juli 2027, Kurhaus und Casino)
+# einmalig prüfen (alle Trauorte, Meldung nur für Kurhaus und Casino)
 python3 traukalender_monitor.py
 
 # dauerhaft laufen lassen, alle 15 Minuten
 python3 traukalender_monitor.py --watch
 
-# abweichend: anderer Monat, andere Trauorte, alle Wochentage
-python3 traukalender_monitor.py --monate 2027-08 --trauorte alle --wochentage alle
+# abweichend: anderer Monat, alle Wochentage, Meldung für jeden Trauort
+python3 traukalender_monitor.py --monate 2027-08 --wochentage alle --melde-trauorte alle
+
+# nur zwei Trauorte überhaupt abfragen (spart Anfragen)
+python3 traukalender_monitor.py --trauorte 1210,1345
 
 # wie weit ist der Kalender aktuell geöffnet?
 python3 traukalender_monitor.py --horizont
@@ -139,9 +146,10 @@ Nachweis. **Gebucht wird nichts** – der Workflow ist ein reiner Monitor.
    `TK_SMTP_USER`, `TK_SMTP_PASS`, `TK_MAIL_FROM`, `TK_MAIL_TO`,
    `TK_TELEGRAM_TOKEN`, `TK_TELEGRAM_CHAT`, `TK_WEBHOOK_URL`.
    Was beobachtet wird, lässt sich über *Variables* überschreiben:
-   `TK_MONATE` (Standard `2027-07`), `TK_TRAUORTE` (Standard `1210,1345` =
-   Kurhaus und Casino-Gesellschaft) und `TK_WOCHENTAGE` (Standard `samstag`,
-   `alle` für jeden Tag).
+   `TK_MONATE` (Standard `2027-07`), `TK_TRAUORTE` (welche geprüft werden,
+   Standard `alle`), `TK_MELDE_TRAUORTE` (welche eine Benachrichtigung auslösen,
+   Standard `1210,1345` = Kurhaus und Casino-Gesellschaft) und `TK_WOCHENTAGE`
+   (Standard `samstag`, `alle` für jeden Tag).
 4. *Settings → Notifications* prüfen, damit die Issue-Mails auch ankommen.
 
 **Wenn die Issue-Mail nicht ankommt**
