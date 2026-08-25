@@ -4,7 +4,7 @@
       "Kurhaus",
       "Wiesbadener Casino-Gesellschaft"
     ],
-    "reservierbar_bis": "2027-08-24",
+    "reservierbar_bis": "2027-08-25",
     "trauorte": {
       "1187": {
         "meldet": false,
@@ -87,5 +87,5 @@
     ]
   },
   "gemeldet": {},
-  "letzte_pruefung": "2026-08-24"
+  "letzte_pruefung": "2026-08-25"
 }
